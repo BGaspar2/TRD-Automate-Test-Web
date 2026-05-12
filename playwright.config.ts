@@ -11,6 +11,7 @@ export default defineConfig({
     baseURL: 'https://kfc-ec-devops5-artisn.vercel.app/',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    video: 'on',
     viewport: { width: 1280, height: 720 },
   },
   projects: [

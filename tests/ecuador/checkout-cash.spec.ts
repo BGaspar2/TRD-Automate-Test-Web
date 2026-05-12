@@ -103,10 +103,12 @@ test.describe('KFC Ecuador - Anonymous Checkout with Cash', () => {
       if (!stillEmpty) {
         addedToCart = true;
       } else if (attempt < 2) {
-        // Go back to the combos page and retry
-        await page.goto('/menu/combos');
+        // Go back to the main menu and retry
+        await page.goto('/');
         await page.waitForLoadState('domcontentloaded');
-        await page.waitForTimeout(3000);
+        await page.getByText('COMBOS', { exact: true }).first().waitFor({ state: 'visible' });
+        await page.getByText('COMBOS', { exact: true }).first().click();
+        await page.waitForTimeout(5000);
       }
     }
 
@@ -267,19 +269,42 @@ test.describe('KFC Ecuador - Anonymous Checkout with Cash', () => {
       // Wait for the right-side detail panel to populate (it loads async)
       await page.waitForTimeout(10000);
 
+      // Scroll to the right panel to ensure it's visible in the video
+      await page.evaluate(() => {
+        const detailPanel = document.querySelector('[class*="OrderDetail"], [class*="OrderPanel"], main section:last-child');
+        if (detailPanel) detailPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+      await page.waitForTimeout(2000);
+
       const pageText = await page.evaluate(() => document.body.innerText);
 
       // Pattern: seqval like "0000004328-010103" (7+ digits, dash, 4+ digits)
       const seqMatch = pageText.match(/\d{7,}-\d{4,}/);
       if (seqMatch) {
         orderSeqval = seqMatch[0];
+        // Visual cue for the video: highlight the code if found
+        await page.evaluate((code) => {
+          const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+          let node;
+          while (node = walker.nextNode()) {
+            if (node.textContent?.includes(code)) {
+              const span = document.createElement('span');
+              span.style.backgroundColor = 'yellow';
+              span.style.fontSize = '24px';
+              span.style.padding = '5px';
+              span.style.border = '2px solid red';
+              node.parentNode?.replaceChild(span, node);
+              span.textContent = code;
+              span.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }
+        }, orderSeqval);
       } else {
-        // Debug: print the page text to understand the structure
         console.log('\nDEBUG - Order detail page text (first 1500 chars):\n');
         console.log(pageText.substring(0, 1500));
       }
 
-      // Take screenshot of the order detail panel
+      await page.waitForTimeout(5000); // Wait 5s for the video to capture the result clearly
       await page.screenshot({ path: 'test-results/order-detail.png', fullPage: true });
     }
 
