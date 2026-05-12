@@ -1,0 +1,12 @@
+{
+  "name": "kfc-automation",
+  "version": "1.0.0",
+  "description": "Automated tests for KFC websites",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0"
+  }
+}
