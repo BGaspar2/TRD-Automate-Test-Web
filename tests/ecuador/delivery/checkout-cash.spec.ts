@@ -60,5 +60,15 @@ test.describe('KFC Ecuador - Anonymous Checkout with Cash (Delivery) - DEBUG', (
       console.log('✅ Channel and Address selected! Current URL:', page.url());
       expect(page.url()).toContain('menu');
     });
+
+    await test.step('3. Select Category: COMBOS', async () => {
+      console.log('🍗 Navigating to COMBOS category...');
+      const categoryCombos = page.locator('button, a, div').filter({ hasText: /^COMBOS$/i }).last();
+      await categoryCombos.waitFor({ state: 'visible', timeout: 20000 });
+      await categoryCombos.click({ force: true });
+      await page.waitForTimeout(4000);
+      
+      console.log('✅ Category COMBOS selected!');
+    });
   });
 });
