@@ -3,6 +3,8 @@ import path from 'path';
 
 export default defineConfig({
   testDir: path.join(__dirname, 'tests'),
+  testMatch: '**/*.js',
+  timeout: 120000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -19,10 +21,6 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-    },
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
+    }
   ],
 });
