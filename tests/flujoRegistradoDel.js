@@ -10,8 +10,13 @@ test('Flujo E2E - Compra a domicilio usuario registrado', async () => {
     const userDataDir = path.resolve(process.cwd(), 'tests', 'user_data_chrome');
     console.log("Cargando sesión guardada desde Chrome...");
 
+    const videoDir = path.resolve(process.cwd(), 'tests', 'video_result');
+
     const context = await chromium.launchPersistentContext(userDataDir, {
-        headless: false
+        headless: false,
+        recordVideo: {
+            dir: videoDir
+        }
     });
 
     const page = context.pages()[0] || await context.newPage();
@@ -231,5 +236,11 @@ test('Flujo E2E - Compra a domicilio usuario registrado', async () => {
     console.log("Flujo de prueba finalizado.");
     await page.waitForTimeout(5000);
 
+    const video = page.video();
     await context.close();
+
+    if (video) {
+        const videoPath = await video.path();
+        console.log(`Video grabado y guardado en: ${videoPath}`);
+    }
 });
