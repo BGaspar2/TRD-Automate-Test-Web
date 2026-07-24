@@ -1,18 +1,18 @@
 # TRD-Automate-Test-Web
 
-Automatización de pruebas E2E para el flujo de compra y checkout de KFC (Ecuador) utilizando **Playwright**.
+Automatización de pruebas E2E para el flujo de compra y checkout de KFC (Ecuador) utilizando **Playwright Test Runner**.
 
 ---
 
 ## 🚀 Características
 
-- **Pruebas End-to-End con Playwright:** Cobertura de flujos completos desde la selección de canal hasta el checkout.
+- **Pruebas End-to-End con Playwright Test Runner:** Cobertura de flujos completos utilizando la sintaxis oficial de `@playwright/test`.
 - **Soporte para Usuario Anónimo e Invitado:** Automatización del proceso de compra sin iniciar sesión.
 - **Soporte para Usuario Registrado:** Manejo de sesiones persistentes con Google (`user_data_chrome`).
 - **Validaciones Dinámicas:**
   - Selección inteligente de modificadores obligatorios en combos y productos.
   - Verificación condicional de dirección y datos de facturación guardados.
-- **Grabación de Video:** Registro en video `.webm` de cada ejecución guardado en `tests/video_result/`.
+- **Grabación de Video y Reportes:** Generación automática de videos `.webm` y reportes HTML de Playwright.
 
 ---
 
@@ -38,18 +38,17 @@ Automatización de pruebas E2E para el flujo de compra y checkout de KFC (Ecuado
 ```
 TRD-Automate-Test-Web/
 ├── tests/
-│   ├── auth.js                 # Script para iniciar sesión en Google y guardar el perfil
-│   ├── flujoAnonimoDel.js       # Flujo E2E a domicilio para usuario anónimo
-│   ├── flujoRegistradoDel.js    # Flujo E2E a domicilio para usuario registrado
-│   └── video_result/           # Carpeta donde se almacenan las grabaciones en video
-├── playwright.config.ts        # Configuración global de Playwright
+│   ├── auth.js                 # Script interactivo para iniciar sesión en Google
+│   ├── flujoAnonimoDel.js       # Test E2E Playwright a domicilio para usuario anónimo
+│   └── flujoRegistradoDel.js    # Test E2E Playwright a domicilio para usuario registrado
+├── playwright.config.ts        # Configuración del Runner de Playwright
 ├── package.json
 └── README.md
 ```
 
 ---
 
-## ⚙️ Ejecución de los Scripts
+## ⚙️ Ejecución de Pruebas
 
 ### 1. Autenticación (Solo primera vez para usuario registrado)
 Para guardar la sesión de Google en la carpeta `user_data_chrome`:
@@ -58,20 +57,34 @@ node .\tests\auth.js
 ```
 > *Sigue las instrucciones en la consola para iniciar sesión manualmente en la ventana de Chrome y presiona Enter.*
 
-### 2. Flujo Usuario Anónimo (Domicilio)
-Ejecuta la compra E2E completa como usuario anónimo / invitado:
-```bash
-node .\tests\flujoAnonimoDel.js
-```
+---
 
-### 3. Flujo Usuario Registrado (Domicilio)
-Ejecuta la compra E2E utilizando la sesión previamente guardada:
-```bash
-node .\tests\flujoRegistradoDel.js
-```
+### 2. Ejecutar Pruebas con Playwright Test Runner (`npx playwright test`)
+
+- **Ejecutar todos los tests:**
+  ```bash
+  npx playwright test
+  ```
+
+- **Ejecutar en modo visible (con navegador abierto):**
+  ```bash
+  npx playwright test --headed
+  ```
+
+- **Ejecutar un flujo específico:**
+  - *Flujo Anónimo:*
+    ```bash
+    npx playwright test tests/flujoAnonimoDel.js --headed
+    ```
+  - *Flujo Registrado:*
+    ```bash
+    npx playwright test tests/flujoRegistradoDel.js --headed
+    ```
 
 ---
 
-## 📹 Grabación de Pantalla
-Los videos de cada prueba se guardan automáticamente en formato `.webm` en la siguiente ruta:
-`tests/video_result/`
+### 📊 Ver Reportes HTML
+Después de la ejecución, puedes visualizar el reporte interactivo de Playwright:
+```bash
+npx playwright show-report
+```
