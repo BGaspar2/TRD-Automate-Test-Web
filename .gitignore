@@ -5,3 +5,7 @@ blob-report/
 playwright/.cache/
 .env
 inspect-order.ts
+user_data_chrome/
+video_result/
+*.webm
+
