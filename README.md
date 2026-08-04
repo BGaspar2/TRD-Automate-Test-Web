@@ -1,18 +1,30 @@
 # TRD-Automate-Test-Web
 
-Automatización de pruebas E2E para el flujo de compra y checkout de KFC (Ecuador) utilizando **Playwright Test Runner**.
+Automatización de pruebas E2E multi-país para los flujos de compra y checkout de **KFC LATAM** utilizando **Playwright Test Runner** y la arquitectura **Page Object Model (POM)**.
 
 ---
 
-## 🚀 Características
+## 🌎 Cobertura Regional LATAM
 
-- **Pruebas End-to-End con Playwright Test Runner:** Cobertura de flujos completos utilizando la sintaxis oficial de `@playwright/test`.
-- **Soporte para Usuario Anónimo e Invitado:** Automatización del proceso de compra sin iniciar sesión.
-- **Soporte para Usuario Registrado:** Manejo de sesiones persistentes con Google (`user_data_chrome`).
-- **Validaciones Dinámicas:**
-  - Selección inteligente de modificadores obligatorios en combos y productos.
-  - Verificación condicional de dirección y datos de facturación guardados.
-- **Grabación de Video y Reportes:** Generación automática de videos `.webm` y reportes HTML de Playwright.
+La suite automatiza el flujo completo de compra a domicilio en usuario anónimo para **Ecuador**, **Chile**, **Colombia** y **Venezuela**:
+
+| País | Carpeta | Búsqueda de Ubicación | Documento ID | URL Base |
+| :--- | :--- | :--- | :--- | :--- |
+| **🇪🇨 Ecuador** | `tests/ecuador/` | `Av. El Inca` | Cédula (`1712345678`) | `https://kfc-ec-devops5-artisn.vercel.app/` |
+| **🇨🇱 Chile** | `tests/chile/` | `Guardia Vieja 255` | RUT (`12345678-9`) | `https://kfc-cl-devops5-artisn.vercel.app/` |
+| **🇨🇴 Colombia** | `tests/colombia/` | `Toberin` | Cédula (`1012345678`) | `https://kfc-co-devops5-artisn.vercel.app/` |
+| **🇻🇪 Venezuela** | `tests/venezuela/` | `Sabana Grande` | Cédula (`V12345678`) | `https://kfc-ve-devops5-artisn.vercel.app/` |
+
+---
+
+## 🚀 Características y Estrategia de Selección Resiliente
+
+- **Arquitectura Page Object Model (POM):** Separación modular de locators, datos de prueba y lógica por páginas (`HomePage`, `MenuPage`, `CartPage`, `CheckoutPage`).
+- **Suite Máster Regional:** Ejecución secuencial o paralela de todos los países en una sola corrida (`tests/flujoRegionalAnonimo.js`).
+- **Selección Inteligente de Checkout (`OrderTotal`):** Detección dinámica entre botones móviles y de escritorio para evitar fallos por elementos ocultos (`hidden`).
+- **Preservación de Google Maps:** Conservación automática del texto completo de la dirección asignado por Google Maps para evitar rechazo de cobertura en la API de la tienda.
+- **Disparo de Eventos React Nativos:** Emisión de eventos `input`, `change` y `blur` para notificar a React Hook Form y garantizar la habilitación de los botones de envío.
+- **Escáner Dinámico de DOM (0 ms):** Verificación con `count()` instantáneo de los elementos `<input>` y `<textarea>` realmente presentes en cada país.
 
 ---
 
@@ -35,13 +47,29 @@ Automatización de pruebas E2E para el flujo de compra y checkout de KFC (Ecuado
 
 ## 📁 Estructura del Proyecto
 
-```
+```text
 TRD-Automate-Test-Web/
 ├── tests/
-│   ├── auth.js                 # Script interactivo para iniciar sesión en Google
-│   ├── flujoAnonimoDel.js       # Test E2E Playwright a domicilio para usuario anónimo
-│   └── flujoRegistradoDel.js    # Test E2E Playwright a domicilio para usuario registrado
-├── playwright.config.ts        # Configuración del Runner de Playwright
+│   ├── flujoRegionalAnonimo.js   # SUITE MÁSTER REGIONAL (Ejecuta EC, CL, CO, VE)
+│   ├── ecuador/
+│   │   ├── data/testData.js
+│   │   ├── pages/ (HomePage, MenuPage, CartPage, CheckoutPage)
+│   │   └── flujoAnonimoDel.js
+│   ├── chile/
+│   │   ├── data/testData.js
+│   │   ├── pages/ (HomePage, MenuPage, CartPage, CheckoutPage)
+│   │   └── flujoAnonimoDel.js
+│   ├── colombia/
+│   │   ├── data/testData.js
+│   │   ├── pages/ (HomePage, MenuPage, CartPage, CheckoutPage)
+│   │   └── flujoAnonimoDel.js
+│   ├── venezuela/
+│   │   ├── data/testData.js
+│   │   ├── pages/ (HomePage, MenuPage, CartPage, CheckoutPage)
+│   │   └── flujoAnonimoDel.js
+│   ├── auth.js                   # Script para autenticación persistente
+│   └── flujoRegistradoDel.js     # Flujo E2E para usuario registrado
+├── playwright.config.ts          # Configuración del Runner de Playwright
 ├── package.json
 └── README.md
 ```
@@ -50,41 +78,48 @@ TRD-Automate-Test-Web/
 
 ## ⚙️ Ejecución de Pruebas
 
-### 1. Autenticación (Solo primera vez para usuario registrado)
-Para guardar la sesión de Google en la carpeta `user_data_chrome`:
-```bash
-node .\tests\auth.js
-```
-> *Sigue las instrucciones en la consola para iniciar sesión manualmente en la ventana de Chrome y presiona Enter.*
+### 1. Ejecutar Suite Regional LATAM (Todos los Países)
+
+- **Modo Visible (Recomendado):**
+  ```bash
+  npm run test:regional
+  ```
+  *o directamente:*
+  ```bash
+  npx playwright test tests/flujoRegionalAnonimo.js --headed
+  ```
+
+- **Modo Headless (Sin interfaz):**
+  ```bash
+  npm run test:regional:headless
+  ```
 
 ---
 
-### 2. Ejecutar Pruebas con Playwright Test Runner (`npx playwright test`)
+### 2. Ejecutar Pruebas por País Individual
 
-- **Ejecutar todos los tests:**
+- **Ecuador:**
   ```bash
-  npx playwright test
+  npm run test:ecuador
   ```
-
-- **Ejecutar en modo visible (con navegador abierto):**
+- **Chile:**
   ```bash
-  npx playwright test --headed
+  npm run test:chile
   ```
-
-- **Ejecutar un flujo específico:**
-  - *Flujo Anónimo:*
-    ```bash
-    npx playwright test tests/flujoAnonimoDel.js --headed
-    ```
-  - *Flujo Registrado:*
-    ```bash
-    npx playwright test tests/flujoRegistradoDel.js --headed
-    ```
+- **Colombia:**
+  ```bash
+  npm run test:colombia
+  ```
+- **Venezuela:**
+  ```bash
+  npm run test:venezuela
+  ```
 
 ---
 
-### 📊 Ver Reportes HTML
-Después de la ejecución, puedes visualizar el reporte interactivo de Playwright:
+## 📊 Ver Reportes HTML
+
+Después de la ejecución, puedes visualizar el reporte gráfico interactivo de Playwright:
 ```bash
 npx playwright show-report
 ```

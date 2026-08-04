@@ -1,0 +1,128 @@
+import { expect } from '@playwright/test';
+
+export class MenuPage {
+    /**
+     * @param {import('@playwright/test').Page} page
+     */
+    constructor(page) {
+        this.page = page;
+
+        // Locators resilientes con fallbacks
+        this.categorias = page.locator('.CategoriesGrid a figure, .CategoriesGrid a, [class*="CategoriesGrid"] a');
+        this.tarjetasProductos = page.locator('.ProductCard, [class*="ProductCard"], [data-testid^="product-"]');
+        this.contenedorTotales = page.locator('.ProductTotals, [class*="ProductTotals"], [class*="totals"]');
+
+        this.btnSumar = page.locator('.ProductTotals button:has(svg.feather-plus), .ProductTotals button:has-text("+"), [class*="Counter"] button:has(svg.feather-plus)')
+            .or(page.locator('button:has(svg.feather-plus)'));
+
+        this.contadorTexto = page.locator('.ProductTotals .Counter__quantity, [class*="quantity"], [class*="Counter__quantity"]');
+
+        this.btnAgregarCarrito = page.getByTestId('add-to-cart')
+            .or(page.getByRole('button', { name: /agregar al carrito|añadir al carrito|confirmar/i }))
+            .or(page.locator('button[data-testid="add-to-cart"]'));
+
+        this.gruposModificadores = page.locator('.ProductForm .ModifiersGroup, [class*="ModifiersGroup"], [class*="ModifierGroup"]');
+    }
+
+    async seleccionarCategoriaAleatoria() {
+        const totalCategorias = await this.categorias.count();
+        const indiceAleatorio = Math.floor(Math.random() * totalCategorias);
+        console.log(`Seleccionando categoría aleatoria (${indiceAleatorio + 1} de ${totalCategorias})...`);
+        const cat = this.categorias.nth(indiceAleatorio);
+        await cat.scrollIntoViewIfNeeded().catch(() => {});
+        await cat.click();
+        await this.page.waitForTimeout(3000);
+    }
+
+    async seleccionarProductoAleatorio() {
+        await this.tarjetasProductos.first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        let totalProductos = await this.tarjetasProductos.count();
+        if (totalProductos === 0) {
+            await this.page.waitForTimeout(3000);
+            totalProductos = await this.tarjetasProductos.count();
+        }
+
+        const indiceAleatorio = Math.floor(Math.random() * totalProductos);
+        console.log(`Seleccionando producto aleatorio (${indiceAleatorio + 1} de ${totalProductos}) y haciendo clic en Agregar...`);
+        const tarjeta = this.tarjetasProductos.nth(indiceAleatorio);
+        await tarjeta.scrollIntoViewIfNeeded().catch(() => {});
+
+        // Estrategia de detección de botón: texto "Agregar/Añadir/+", ícono SVG feather-plus, botón CSS o tarjeta directa
+        let btnAgregar = tarjeta.locator('button').filter({ hasText: /agregar|añadir|\+/i }).first();
+        if (!(await btnAgregar.isVisible({ timeout: 1500 }).catch(() => false))) {
+            btnAgregar = tarjeta.locator('button:has(svg.feather-plus), button.Button, [role="button"]').first();
+        }
+        if (!(await btnAgregar.isVisible({ timeout: 1500 }).catch(() => false))) {
+            btnAgregar = tarjeta.locator('button, a').first();
+        }
+        if (!(await btnAgregar.isVisible({ timeout: 1500 }).catch(() => false))) {
+            btnAgregar = tarjeta;
+        }
+
+        await btnAgregar.scrollIntoViewIfNeeded().catch(() => {});
+        await btnAgregar.click();
+        await this.page.waitForTimeout(5000);
+    }
+
+    async ajustarCantidad(cantidadDeseada) {
+        const contenedor = this.contenedorTotales.first();
+        await contenedor.waitFor({ state: 'visible' });
+
+        const contador = this.contadorTexto.first();
+        let cantidadActual = parseInt(await contador.innerText());
+        console.log(`Paso 1: Aumentando cantidad de ${cantidadActual} a ${cantidadDeseada}...`);
+
+        const sumarBtn = this.btnSumar.first();
+        while (cantidadActual < cantidadDeseada) {
+            await sumarBtn.click();
+            await this.page.waitForTimeout(300);
+            cantidadActual = parseInt(await contador.innerText());
+        }
+    }
+
+    async validarYSeleccionarModificadores() {
+        console.log("Validando modificadores obligatorios...");
+        const totalGrupos = await this.gruposModificadores.count();
+
+        for (let i = 0; i < totalGrupos; i++) {
+            const grupo = this.gruposModificadores.nth(i);
+            const titulo = await grupo.locator('h3, h4, [class*="title"]').first().innerText().catch(() => `Grupo ${i + 1}`);
+            const contadorElemento = grupo.locator('.ReadonlyCounter, [class*="Counter"], [class*="counter"]').first();
+
+            if (await contadorElemento.isVisible({ timeout: 1500 }).catch(() => false)) {
+                const textoContador = await contadorElemento.innerText();
+
+                if (textoContador.includes('0 /') || textoContador.startsWith('0')) {
+                    console.log(`Falta seleccionar en: "${titulo}". Eligiendo primera opción...`);
+
+                    const primerRadio = grupo.locator('.RadioModifier label, input[type="radio"] + label, label').first();
+                    if (await primerRadio.isVisible({ timeout: 1000 }).catch(() => false)) {
+                        await primerRadio.click();
+                        await this.page.waitForTimeout(200);
+                        continue;
+                    }
+
+                    const primerBotonMas = grupo.locator('.CounterModifier button:has(svg.feather-plus), button:has(svg.feather-plus), button:has-text("+")').first();
+                    if (await primerBotonMas.isVisible({ timeout: 1000 }).catch(() => false)) {
+                        await primerBotonMas.click();
+                        await this.page.waitForTimeout(200);
+                    }
+                } else {
+                    console.log(`Modificador listo en: "${titulo}" (${textoContador.replace(/\n/g, '')}).`);
+                }
+            }
+        }
+    }
+
+    async agregarAlCarrito(cantidadDeseada) {
+        console.log("Paso 2: Confirmando y agregando al carrito...");
+        let btn = this.btnAgregarCarrito.first();
+        if (!(await btn.isVisible({ timeout: 2000 }).catch(() => false))) {
+            btn = this.contenedorTotales.locator('button').filter({ hasText: /agregar|añadir|confirmar/i }).first();
+        }
+        await expect(btn).toBeVisible();
+        await btn.click();
+        console.log(`¡Listo! Se agregaron ${cantidadDeseada} unidades al pedido.`);
+        await this.page.waitForTimeout(5000);
+    }
+}
