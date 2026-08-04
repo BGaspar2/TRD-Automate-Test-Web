@@ -1,10 +1,16 @@
 {
   "name": "kfc-automation",
   "version": "1.0.0",
-  "description": "Automated tests for KFC websites",
+  "description": "Automated E2E tests for KFC LATAM websites",
   "main": "index.js",
   "scripts": {
-    "test": "playwright test"
+    "test": "playwright test",
+    "test:regional": "playwright test tests/flujoRegionalAnonimo.js --headed",
+    "test:regional:headless": "playwright test tests/flujoRegionalAnonimo.js",
+    "test:ecuador": "playwright test tests/ecuador/flujoAnonimoDel.js --headed",
+    "test:chile": "playwright test tests/chile/flujoAnonimoDel.js --headed",
+    "test:colombia": "playwright test tests/colombia/flujoAnonimoDel.js --headed",
+    "test:venezuela": "playwright test tests/venezuela/flujoAnonimoDel.js --headed"
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",
