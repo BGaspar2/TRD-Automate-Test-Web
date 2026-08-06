@@ -25,9 +25,16 @@ export class MenuPage {
     }
 
     async seleccionarCategoriaAleatoria() {
+        console.log("Esperando a que las categorías del menú estén cargadas...");
+        await this.categorias.first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
         const totalCategorias = await this.categorias.count();
-        const indiceAleatorio = Math.floor(Math.random() * totalCategorias);
-        console.log(`Seleccionando categoría aleatoria (${indiceAleatorio + 1} de ${totalCategorias})...`);
+        if (totalCategorias === 0) {
+            console.log("No se detectaron categorías inmediatamente, reintentando tras espera...");
+            await this.page.waitForTimeout(3000);
+        }
+        const countFinal = await this.categorias.count();
+        const indiceAleatorio = Math.floor(Math.random() * (countFinal || 1));
+        console.log(`Seleccionando categoría aleatoria (${indiceAleatorio + 1} de ${countFinal})...`);
         const cat = this.categorias.nth(indiceAleatorio);
         await cat.scrollIntoViewIfNeeded().catch(() => {});
         await cat.click();

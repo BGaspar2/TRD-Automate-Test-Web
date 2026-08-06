@@ -1,8 +1,8 @@
 export const testData = {
     baseUrl: "https://kfc-br-env-develop-artisn.vercel.app",
     location: {
-        searchQuery: "Av Paulista",
-        fullAddress: "Av. Paulista - Bela Vista, São Paulo - SP, Brasil"
+        searchQuery: "vila olimpa",
+        fullAddress: "Vila Olímpia, São Paulo - SP, Brasil"
     },
     order: {
         desiredQuantity: 3

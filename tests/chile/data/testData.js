@@ -1,8 +1,8 @@
 export const testData = {
     baseUrl: "https://kfc-cl-devops5-artisn.vercel.app/",
     location: {
-        searchQuery: "Guardia Vieja 255",
-        fullAddress: "Guardia vieja 255 - Guardia Vieja, Providencia, Chile"
+        searchQuery: "guarida vieja",
+        fullAddress: "Guardia Vieja, Providencia, Chile"
     },
     order: {
         desiredQuantity: 3

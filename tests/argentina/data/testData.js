@@ -1,8 +1,8 @@
 export const testData = {
     baseUrl: "https://kfc-ar-env-develop-artisn.vercel.app",
     location: {
-        searchQuery: "Av Corrientes",
-        fullAddress: "Av. Corrientes - San Nicolás, Buenos Aires, Argentina"
+        searchQuery: "alto palermo",
+        fullAddress: "Alto Palermo Shopping, Avenida Santa Fe, Buenos Aires, Argentina"
     },
     order: {
         desiredQuantity: 3
