@@ -349,6 +349,8 @@ Siempre:
 
 ✔ escribir código legible
 
+✔ **Ejecución manual por el usuario**: Las pruebas (`npm run test:...`, `npx playwright test ...`) SIEMPRE las ejecuta el USUARIO en su terminal para probar. El asistente NUNCA debe ejecutar los comandos de prueba por su cuenta.
+
 ---
 
 # Nunca
@@ -366,6 +368,8 @@ No crear Page Objects innecesarios.
 No hardcodear información regional.
 
 No utilizar esperas fijas.
+
+No ejecutar automáticamente las pruebas por cuenta propia (el usuario las ejecuta siempre manualmente).
 
 ---
 
