@@ -1,5 +1,22 @@
 import { test } from '@playwright/test';
 
+// Configurar ejecución secuencial (serial)
+test.describe.configure({ mode: 'serial' });
+
+// 🇦🇷 ARGENTINA
+import { testData as testDataAR } from './argentina/data/testData.js';
+import { HomePage as HomePageAR } from './argentina/pages/HomePage.js';
+import { MenuPage as MenuPageAR } from './argentina/pages/MenuPage.js';
+import { CartPage as CartPageAR } from './argentina/pages/CartPage.js';
+import { CheckoutPage as CheckoutPageAR } from './argentina/pages/CheckoutPage.js';
+
+// 🇧🇷 BRASIL
+import { testData as testDataBR } from './brasil/data/testData.js';
+import { HomePage as HomePageBR } from './brasil/pages/HomePage.js';
+import { MenuPage as MenuPageBR } from './brasil/pages/MenuPage.js';
+import { CartPage as CartPageBR } from './brasil/pages/CartPage.js';
+import { CheckoutPage as CheckoutPageBR } from './brasil/pages/CheckoutPage.js';
+
 // 🇪🇨 ECUADOR
 import { testData as testDataEC } from './ecuador/data/testData.js';
 import { HomePage as HomePageEC } from './ecuador/pages/HomePage.js';
@@ -28,7 +45,61 @@ import { MenuPage as MenuPageVE } from './venezuela/pages/MenuPage.js';
 import { CartPage as CartPageVE } from './venezuela/pages/CartPage.js';
 import { CheckoutPage as CheckoutPageVE } from './venezuela/pages/CheckoutPage.js';
 
-test.describe.serial('Suite Regional LATAM - Flujo Compra Anónima a Domicilio', () => {
+test.describe('Suite Regional LATAM - Flujo Compra Anónima (AR, BR, CL, CO, EC, VE)', () => {
+
+    test('🇦🇷 Argentina - Compra en Pickup usuario anónimo', async ({ page }) => {
+        const homePage = new HomePageAR(page);
+        const menuPage = new MenuPageAR(page);
+        const cartPage = new CartPageAR(page);
+        const checkoutPage = new CheckoutPageAR(page);
+
+        await homePage.navegar(testDataAR.baseUrl);
+        await homePage.seleccionarCanalPickup(testDataAR.location.searchQuery, testDataAR.location.fullAddress);
+
+        await menuPage.seleccionarCategoriaAleatoria();
+        await menuPage.seleccionarProductoAleatorio();
+        await menuPage.ajustarCantidad(testDataAR.order.desiredQuantity);
+        await menuPage.validarYSeleccionarModificadores();
+        await menuPage.agregarAlCarrito(testDataAR.order.desiredQuantity);
+
+        await cartPage.procesarModalCarrito();
+        await cartPage.validarYAjustarMontoCarrito();
+        await cartPage.irAPagar();
+
+        await checkoutPage.iniciarCompletar();
+        await checkoutPage.llenarDatosPersonales(testDataAR.customer);
+        await checkoutPage.seleccionarMetodoPago(testDataAR.paymentMethodId);
+
+        console.log("Flujo Argentina finalizado con éxito.");
+        await page.waitForTimeout(3000);
+    });
+
+    test('🇧🇷 Brasil - Compra en Pickup usuario anónimo', async ({ page }) => {
+        const homePage = new HomePageBR(page);
+        const menuPage = new MenuPageBR(page);
+        const cartPage = new CartPageBR(page);
+        const checkoutPage = new CheckoutPageBR(page);
+
+        await homePage.navegar(testDataBR.baseUrl);
+        await homePage.seleccionarCanalPickup(testDataBR.location.searchQuery, testDataBR.location.fullAddress);
+
+        await menuPage.seleccionarCategoriaAleatoria();
+        await menuPage.seleccionarProductoAleatorio();
+        await menuPage.ajustarCantidad(testDataBR.order.desiredQuantity);
+        await menuPage.validarYSeleccionarModificadores();
+        await menuPage.agregarAlCarrito(testDataBR.order.desiredQuantity);
+
+        await cartPage.procesarModalCarrito();
+        await cartPage.validarYAjustarMontoCarrito();
+        await cartPage.irAPagar();
+
+        await checkoutPage.iniciarCompletar();
+        await checkoutPage.llenarDatosPersonales(testDataBR.customer);
+        await checkoutPage.seleccionarMetodoPago(testDataBR.paymentMethodId);
+
+        console.log("Flujo Brasil finalizado con éxito.");
+        await page.waitForTimeout(3000);
+    });
 
     test('🇪🇨 Ecuador - Compra a domicilio usuario anónimo', async ({ page }) => {
         const homePage = new HomePageEC(page);
@@ -47,6 +118,7 @@ test.describe.serial('Suite Regional LATAM - Flujo Compra Anónima a Domicilio',
         await menuPage.agregarAlCarrito(testDataEC.order.desiredQuantity);
 
         await cartPage.procesarModalCarrito();
+        await cartPage.validarYAjustarMontoCarrito();
         await cartPage.irAPagar();
 
         await checkoutPage.iniciarCompletar();
@@ -75,6 +147,7 @@ test.describe.serial('Suite Regional LATAM - Flujo Compra Anónima a Domicilio',
         await menuPage.agregarAlCarrito(testDataCL.order.desiredQuantity);
 
         await cartPage.procesarModalCarrito();
+        await cartPage.validarYAjustarMontoCarrito();
         await cartPage.irAPagar();
 
         await checkoutPage.iniciarCompletar();
@@ -103,6 +176,7 @@ test.describe.serial('Suite Regional LATAM - Flujo Compra Anónima a Domicilio',
         await menuPage.agregarAlCarrito(testDataCO.order.desiredQuantity);
 
         await cartPage.procesarModalCarrito();
+        await cartPage.validarYAjustarMontoCarrito();
         await cartPage.irAPagar();
 
         await checkoutPage.iniciarCompletar();
@@ -131,6 +205,7 @@ test.describe.serial('Suite Regional LATAM - Flujo Compra Anónima a Domicilio',
         await menuPage.agregarAlCarrito(testDataVE.order.desiredQuantity);
 
         await cartPage.procesarModalCarrito();
+        await cartPage.validarYAjustarMontoCarrito();
         await cartPage.irAPagar();
 
         await checkoutPage.iniciarCompletar();

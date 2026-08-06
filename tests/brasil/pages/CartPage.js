@@ -10,27 +10,19 @@ export class CartPage {
         this.modalCarrito = page.locator('.ProductInCartModal, [class*="ProductInCartModal"], [class*="cart-modal"]');
         this.btnIconoCarrito = page.locator('a[href*="/cart"], a[href*="/checkout"], [data-testid*="cart"], button:has(svg.feather-shopping-bag), .FloatingCart, .HeaderCart, .CartButton');
 
-        // Locators para banners de validación de monto mínimo y máximo
         this.alertaMinimo = page.locator('.OrderMinimumAlert, [class*="minimum"], [class*="Alert"], [class*="alert"], [class*="Banner"]')
-            .filter({ hasText: /pedido mínimo|mínimo es de|agrega más productos/i });
+            .filter({ hasText: /pedido mínimo|mínimo es de|mínimo de|agrega más productos/i });
 
         this.alertaMaximo = page.locator('.OrderMaximumAlert, [class*="maximum"], [class*="Alert"], [class*="alert"], [class*="Banner"]')
-            .filter({ hasText: /pedido máximo|máximo es de|supera el máximo|disminuye/i });
+            .filter({ hasText: /pedido máximo|máximo es de|máximo de|supera el máximo|disminuye/i });
 
-        // Botones de ajuste de cantidad en el carrito
         this.btnAumentarCantidad = page.locator('button:has-text("+"), [aria-label*="aumentar"], [class*="plus"], button:has(svg.feather-plus)').first();
         this.btnDisminuirCantidad = page.locator('button:has-text("-"), [aria-label*="disminuir"], [class*="minus"], button:has(svg.feather-minus)').first();
     }
 
-    /**
-     * Valida si el carrito cumple con el monto mínimo y no supera el monto máximo.
-     * Si no cumple el mínimo, aumenta la cantidad (+). Si supera el máximo, disminuye (-).
-     * @param {number} maxIntentos Límite máximo de reintentos para evitar bucles infinitos.
-     */
     async validarYAjustarMontoCarrito(maxIntentos = 10) {
         console.log("Validando reglas de monto mínimo/máximo en el carrito...");
 
-        // 1. Validar y ajustar pedido mínimo (Incrementar cantidad con +)
         let intentos = 0;
         while (await this.alertaMinimo.first().isVisible().catch(() => false) && intentos < maxIntentos) {
             const texto = await this.alertaMinimo.first().textContent().catch(() => '');
@@ -46,7 +38,6 @@ export class CartPage {
             intentos++;
         }
 
-        // 2. Validar y ajustar pedido máximo (Disminuir cantidad con -)
         intentos = 0;
         while (await this.alertaMaximo.first().isVisible().catch(() => false) && intentos < maxIntentos) {
             const texto = await this.alertaMaximo.first().textContent().catch(() => '');

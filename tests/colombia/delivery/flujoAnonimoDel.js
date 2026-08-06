@@ -1,9 +1,9 @@
 import { test } from '@playwright/test';
-import { testData } from './data/testData.js';
-import { HomePage } from './pages/HomePage.js';
-import { MenuPage } from './pages/MenuPage.js';
-import { CartPage } from './pages/CartPage.js';
-import { CheckoutPage } from './pages/CheckoutPage.js';
+import { testData } from '../data/testData.js';
+import { HomePage } from '../pages/HomePage.js';
+import { MenuPage } from '../pages/MenuPage.js';
+import { CartPage } from '../pages/CartPage.js';
+import { CheckoutPage } from '../pages/CheckoutPage.js';
 
 test('Flujo E2E - Compra a domicilio usuario anónimo (Colombia)', async ({ page }) => {
     const homePage = new HomePage(page);
@@ -25,6 +25,7 @@ test('Flujo E2E - Compra a domicilio usuario anónimo (Colombia)', async ({ page
 
     // 3. Carrito e Inicio de Pago
     await cartPage.procesarModalCarrito();
+    await cartPage.validarYAjustarMontoCarrito();
     await cartPage.irAPagar();
 
     // 4. Checkout y Confirmación de Datos

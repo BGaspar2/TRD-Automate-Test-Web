@@ -53,17 +53,14 @@ export class CheckoutPage {
     async llenarDireccionEntrega(direccion) {
         console.log("Llenando información de la dirección...");
 
-        // 1. Esperar a que el contenedor de la modal esté presente
         const formAddress = this.page.locator('.AddressForm, form.form').first();
         await formAddress.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
 
-        // 2. Seleccionar etiqueta 'Casa' si está visible
         const btnCasa = this.page.locator('.AddressForm button, form.form button').filter({ hasText: /casa|home/i }).first();
         if (await btnCasa.isVisible({ timeout: 500 }).catch(() => false)) {
             await btnCasa.click().catch(() => {});
         }
 
-        // 3. Inspeccionar los elementos <input> y <textarea> específicos de .AddressForm
         const inputs = this.page.locator('.AddressForm input, .AddressForm textarea');
         const count = await inputs.count();
 

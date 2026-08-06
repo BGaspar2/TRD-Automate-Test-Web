@@ -24,9 +24,16 @@ export class MenuPage {
     }
 
     async seleccionarCategoriaAleatoria() {
+        console.log("Esperando a que las categorías del menú estén cargadas...");
+        await this.categorias.first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
         const totalCategorias = await this.categorias.count();
-        const indiceAleatorio = Math.floor(Math.random() * totalCategorias);
-        console.log(`Seleccionando categoría aleatoria (${indiceAleatorio + 1} de ${totalCategorias})...`);
+        if (totalCategorias === 0) {
+            console.log("No se detectaron categorías inmediatamente, reintentando tras espera...");
+            await this.page.waitForTimeout(3000);
+        }
+        const countFinal = await this.categorias.count();
+        const indiceAleatorio = Math.floor(Math.random() * (countFinal || 1));
+        console.log(`Seleccionando categoría aleatoria (${indiceAleatorio + 1} de ${countFinal})...`);
         const cat = this.categorias.nth(indiceAleatorio);
         await cat.scrollIntoViewIfNeeded().catch(() => {});
         await cat.click();
@@ -71,10 +78,22 @@ export class MenuPage {
         console.log(`Paso 1: Aumentando cantidad de ${cantidadActual} a ${cantidadDeseada}...`);
 
         const sumarBtn = this.btnSumar.first();
-        while (cantidadActual < cantidadDeseada) {
-            await sumarBtn.click();
-            await this.page.waitForTimeout(300);
-            cantidadActual = parseInt(await contador.innerText());
+
+        if (await sumarBtn.isDisabled().catch(() => false)) {
+            console.log("El botón '+' está deshabilitado. Seleccionando modificadores obligatorios...");
+            await this.validarYSeleccionarModificadores();
+        }
+
+        let reintentos = 0;
+        while (cantidadActual < cantidadDeseada && reintentos < 10) {
+            if (await sumarBtn.isEnabled().catch(() => false)) {
+                await sumarBtn.click();
+                await this.page.waitForTimeout(300);
+                cantidadActual = parseInt(await contador.innerText());
+            } else {
+                await this.validarYSeleccionarModificadores();
+            }
+            reintentos++;
         }
     }
 
@@ -85,59 +104,56 @@ export class MenuPage {
         for (let i = 0; i < totalGrupos; i++) {
             const grupo = this.gruposModificadores.nth(i);
             const titulo = await grupo.locator('h3, h4, [class*="title"]').first().innerText().catch(() => `Grupo ${i + 1}`);
+            const textoGrupo = await grupo.innerText().catch(() => '');
+
+            // Si el grupo es opcional ("Hasta X opciones", "Até X opções", "opcional"), NO es obligatorio completar el máximo.
+            if (/hasta \d+|até \d+|opcional|pode selecionar/i.test(textoGrupo)) {
+                console.log(`Grupo opcional detectado: "${titulo}". Se omite autocompletado.`);
+                continue;
+            }
+
             const contadorElemento = grupo.locator('.ReadonlyCounter, [class*="Counter"], [class*="counter"]').first();
+            const mensajeError = grupo.locator('[class*="danger"], [class*="error"], p:has-text("Debes escoger"), p:has-text("escoger"), p:has-text("Obrigatório")').first();
 
-            if (await contadorElemento.isVisible({ timeout: 1500 }).catch(() => false)) {
-                let textoContador = await contadorElemento.innerText();
-                let numeros = textoContador.match(/\d+/g);
+            let requiereSeleccion = false;
+            let faltantes = 1;
 
-                if (numeros && numeros.length >= 2) {
-                    let actual = parseInt(numeros[0]);
-                    let requerido = parseInt(numeros[1]);
+            if (await mensajeError.isVisible({ timeout: 1000 }).catch(() => false)) {
+                requiereSeleccion = true;
+                faltantes = 1;
+            } else if (await contadorElemento.isVisible({ timeout: 1500 }).catch(() => false)) {
+                const textoContador = await contadorElemento.innerText();
+                const match = textoContador.match(/(\d+)\s*\/\s*(\d+)/);
 
-                    if (actual < requerido) {
-                        console.log(`Falta seleccionar en: "${titulo}" (${textoContador.replace(/\n/g, '')}). Seleccionando opciones necesarias (${actual}/${requerido})...`);
-                        let intentos = 0;
-                        while (actual < requerido && intentos < 10) {
-                            intentos++;
-                            let clicHecho = false;
-
-                            const botonesMas = grupo.locator('.CounterModifier button:has(svg.feather-plus), button:has(svg.feather-plus)');
-                            const totalMas = await botonesMas.count();
-                            if (totalMas > 0) {
-                                const ind = Math.min(actual, totalMas - 1);
-                                if (await botonesMas.nth(ind).isVisible()) {
-                                    await botonesMas.nth(ind).click();
-                                    await this.page.waitForTimeout(300);
-                                    clicHecho = true;
-                                }
-                            }
-
-                            if (!clicHecho) {
-                                const opciones = grupo.locator('.RadioModifier label, .CheckboxModifier label, label');
-                                const totalOpciones = await opciones.count();
-                                if (totalOpciones > 0) {
-                                    const ind = Math.min(actual, totalOpciones - 1);
-                                    if (await opciones.nth(ind).isVisible()) {
-                                        await opciones.nth(ind).click();
-                                        await this.page.waitForTimeout(300);
-                                        clicHecho = true;
-                                    }
-                                }
-                            }
-
-                            if (!clicHecho) break;
-                            actual++;
-                        }
-                    }
-                } else if (textoContador.includes('0 /') || textoContador.startsWith('0')) {
-                    console.log(`Falta seleccionar en: "${titulo}". Eligiendo primera opción...`);
-                    const primerRadio = grupo.locator('.RadioModifier label, label').first();
-                    if (await primerRadio.isVisible({ timeout: 1000 }).catch(() => false)) {
-                        await primerRadio.click();
-                        await this.page.waitForTimeout(200);
+                if (match) {
+                    const actual = parseInt(match[1]);
+                    const requerido = parseInt(match[2]);
+                    if (actual < requerido && actual === 0) {
+                        requiereSeleccion = true;
+                        faltantes = requerido - actual;
                     }
                 }
+            }
+
+            if (requiereSeleccion) {
+                console.log(`Falta seleccionar en "${titulo}" (faltan ${faltantes} opciones). Seleccionando...`);
+
+                for (let k = 0; k < faltantes; k++) {
+                    const radioOption = grupo.locator('.RadioModifier label, .CheckboxModifier label, input[type="radio"] + label').nth(k);
+                    if (await radioOption.isVisible({ timeout: 1000 }).catch(() => false)) {
+                        await radioOption.click().catch(() => {});
+                        await this.page.waitForTimeout(300);
+                        continue;
+                    }
+
+                    const plusBtn = grupo.locator('.CounterModifier button:has(svg.feather-plus), button:has-text("+")').first();
+                    if (await plusBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+                        await plusBtn.click().catch(() => {});
+                        await this.page.waitForTimeout(300);
+                    }
+                }
+            } else {
+                console.log(`Modificador listo en: "${titulo}".`);
             }
         }
     }

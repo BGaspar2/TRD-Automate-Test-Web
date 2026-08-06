@@ -1,7 +1,7 @@
 export const testData = {
     baseUrl: "https://kfc-ec-devops5-artisn.vercel.app",
     location: {
-        searchQuery: "El inca",
+        searchQuery: "el inca",
         fullAddress: "El Inca, Quito, Ecuador"
     },
     order: {

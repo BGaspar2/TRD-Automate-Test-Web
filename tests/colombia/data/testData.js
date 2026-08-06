@@ -1,8 +1,8 @@
 export const testData = {
     baseUrl: "https://kfc-co-devops5-artisn.vercel.app",
     location: {
-        searchQuery: "Toberin",
-        fullAddress: "Toberin"
+        searchQuery: "toberin",
+        fullAddress: "Toberin, Bogotá, Colombia"
     },
     order: {
         desiredQuantity: 3
