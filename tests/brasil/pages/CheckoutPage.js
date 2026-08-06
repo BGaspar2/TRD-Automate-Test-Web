@@ -5,13 +5,12 @@ export class CheckoutPage {
     constructor(page) {
         this.page = page;
 
-        this.btnCompletar = page.getByRole('button', { name: /completar|continuar|siguiente/i })
-            .or(page.locator('button, [role="button"]').filter({ hasText: /completar|continuar/i }));
+        this.btnCompletar = page.getByRole('button', { name: /completar|continuar|siguiente|avançar/i })
+            .or(page.locator('button, [role="button"]').filter({ hasText: /completar|continuar|avançar/i }));
 
-        this.btnGuardarDireccion = page.locator('.AddressForm button[type="submit"], form.form button[type="submit"], button:has-text("Guardar dirección"), button:has-text("Guardar")')
-            .or(page.getByRole('button', { name: /guardar/i }));
+        this.btnGuardarDireccion = page.locator('.AddressForm button[type="submit"], form.form button[type="submit"], button:has-text("Guardar dirección"), button:has-text("Guardar"), button:has-text("Salvar")')
+            .or(page.getByRole('button', { name: /guardar|salvar/i }));
 
-        // Locators estrictamente delimitados para el formulario de datos del cliente (.FulfillUser)
         this.inputName = page.locator('.FulfillUser input[name="name"], #name').first();
         this.inputLastName = page.locator('.FulfillUser input[name="lastName"], #lastName').first();
         this.inputEmail = page.locator('.FulfillUser input[name="email"], input[type="email"]').first();
@@ -50,17 +49,14 @@ export class CheckoutPage {
     async llenarDireccionEntrega(direccion) {
         console.log("Llenando información de la dirección...");
 
-        // 1. Esperar a que el contenedor de la modal esté presente
         const formAddress = this.page.locator('.AddressForm, form.form').first();
         await formAddress.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
 
-        // 2. Seleccionar etiqueta 'Casa' si está visible
         const btnCasa = this.page.locator('.AddressForm button, form.form button').filter({ hasText: /casa|home/i }).first();
         if (await btnCasa.isVisible({ timeout: 500 }).catch(() => false)) {
             await btnCasa.click().catch(() => {});
         }
 
-        // 3. Inspeccionar los elementos <input> y <textarea> específicos de .AddressForm
         const inputs = this.page.locator('.AddressForm input, .AddressForm textarea');
         const count = await inputs.count();
 
@@ -77,27 +73,23 @@ export class CheckoutPage {
                     await this.llenarCampoSeguro(input, direccion.secondaryStreet);
                 } else if (nameAttr === 'number' || idAttr === 'number') {
                     await this.llenarCampoSeguro(input, direccion.number);
-                } else if (nameAttr === 'reference' || idAttr === 'reference' || placeholderAttr.toLowerCase().includes('piso') || placeholderAttr.toLowerCase().includes('dpto')) {
+                } else if (nameAttr === 'reference' || idAttr === 'reference' || placeholderAttr.toLowerCase().includes('piso') || placeholderAttr.toLowerCase().includes('dpto') || placeholderAttr.toLowerCase().includes('apto')) {
                     await this.llenarCampoSeguro(input, direccion.reference);
                 } else if (nameAttr === 'phone' || idAttr === 'phone') {
                     await this.llenarCampoSeguro(input, direccion.phone);
-                } else if (nameAttr === 'instructions' || idAttr === 'instructions' || placeholderAttr.toLowerCase().includes('frente')) {
+                } else if (nameAttr === 'instructions' || idAttr === 'instructions' || placeholderAttr.toLowerCase().includes('frente') || placeholderAttr.toLowerCase().includes('instruções')) {
                     await this.llenarCampoSeguro(input, direccion.instructions);
                 }
             }
         }
 
-        if (await formAddress.isVisible().catch(() => false)) {
-            console.log("Guardando dirección de entrega...");
-            const btnGuardar = this.btnGuardarDireccion.first();
-            await btnGuardar.scrollIntoViewIfNeeded().catch(() => {});
-            await btnGuardar.click().catch(async () => {
-                await btnGuardar.evaluate(b => b.click()).catch(() => {});
-            });
-            await this.page.waitForTimeout(3000);
-        } else {
-            console.log("La dirección de entrega ya está configurada.");
-        }
+        console.log("Guardando dirección de entrega...");
+        const btnGuardar = this.btnGuardarDireccion.first();
+        await btnGuardar.scrollIntoViewIfNeeded().catch(() => {});
+        await btnGuardar.click().catch(async () => {
+            await btnGuardar.evaluate(b => b.click()).catch(() => {});
+        });
+        await this.page.waitForTimeout(5000);
     }
 
     async llenarDatosPersonales(cliente) {
@@ -112,7 +104,7 @@ export class CheckoutPage {
 
     async seleccionarMetodoPago(paymentMethodId) {
         console.log(`Seleccionando método de pago: ${paymentMethodId}...`);
-        const selectorPago = this.page.locator(`${paymentMethodId}, input[value*="Efectivo"], label:has-text("Efectivo"), [id*="Efectivo"]`).first();
+        const selectorPago = this.page.locator(`${paymentMethodId}, input[value*="Efectivo"], input[value*="Dinheiro"], label:has-text("Efectivo"), label:has-text("Dinheiro"), [id*="Efectivo"], [id*="Dinheiro"]`).first();
         if (await selectorPago.isVisible({ timeout: 3000 }).catch(() => false)) {
             await selectorPago.check().catch(async () => {
                 await selectorPago.click();

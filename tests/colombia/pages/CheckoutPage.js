@@ -87,13 +87,17 @@ export class CheckoutPage {
             }
         }
 
-        console.log("Guardando dirección de entrega...");
-        const btnGuardar = this.btnGuardarDireccion.first();
-        await btnGuardar.scrollIntoViewIfNeeded().catch(() => {});
-        await btnGuardar.click().catch(async () => {
-            await btnGuardar.evaluate(b => b.click()).catch(() => {});
-        });
-        await this.page.waitForTimeout(5000);
+        if (await formAddress.isVisible().catch(() => false)) {
+            console.log("Guardando dirección de entrega...");
+            const btnGuardar = this.btnGuardarDireccion.first();
+            await btnGuardar.scrollIntoViewIfNeeded().catch(() => {});
+            await btnGuardar.click().catch(async () => {
+                await btnGuardar.evaluate(b => b.click()).catch(() => {});
+            });
+            await this.page.waitForTimeout(3000);
+        } else {
+            console.log("La dirección de entrega ya está configurada.");
+        }
     }
 
     async llenarDatosPersonales(cliente) {

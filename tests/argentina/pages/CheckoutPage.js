@@ -11,7 +11,6 @@ export class CheckoutPage {
         this.btnGuardarDireccion = page.locator('.AddressForm button[type="submit"], form.form button[type="submit"], button:has-text("Guardar dirección"), button:has-text("Guardar")')
             .or(page.getByRole('button', { name: /guardar/i }));
 
-        // Locators estrictamente delimitados para el formulario de datos del cliente (.FulfillUser)
         this.inputName = page.locator('.FulfillUser input[name="name"], #name').first();
         this.inputLastName = page.locator('.FulfillUser input[name="lastName"], #lastName').first();
         this.inputEmail = page.locator('.FulfillUser input[name="email"], input[type="email"]').first();
@@ -50,17 +49,14 @@ export class CheckoutPage {
     async llenarDireccionEntrega(direccion) {
         console.log("Llenando información de la dirección...");
 
-        // 1. Esperar a que el contenedor de la modal esté presente
         const formAddress = this.page.locator('.AddressForm, form.form').first();
         await formAddress.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
 
-        // 2. Seleccionar etiqueta 'Casa' si está visible
         const btnCasa = this.page.locator('.AddressForm button, form.form button').filter({ hasText: /casa|home/i }).first();
         if (await btnCasa.isVisible({ timeout: 500 }).catch(() => false)) {
             await btnCasa.click().catch(() => {});
         }
 
-        // 3. Inspeccionar los elementos <input> y <textarea> específicos de .AddressForm
         const inputs = this.page.locator('.AddressForm input, .AddressForm textarea');
         const count = await inputs.count();
 
@@ -87,17 +83,13 @@ export class CheckoutPage {
             }
         }
 
-        if (await formAddress.isVisible().catch(() => false)) {
-            console.log("Guardando dirección de entrega...");
-            const btnGuardar = this.btnGuardarDireccion.first();
-            await btnGuardar.scrollIntoViewIfNeeded().catch(() => {});
-            await btnGuardar.click().catch(async () => {
-                await btnGuardar.evaluate(b => b.click()).catch(() => {});
-            });
-            await this.page.waitForTimeout(3000);
-        } else {
-            console.log("La dirección de entrega ya está configurada.");
-        }
+        console.log("Guardando dirección de entrega...");
+        const btnGuardar = this.btnGuardarDireccion.first();
+        await btnGuardar.scrollIntoViewIfNeeded().catch(() => {});
+        await btnGuardar.click().catch(async () => {
+            await btnGuardar.evaluate(b => b.click()).catch(() => {});
+        });
+        await this.page.waitForTimeout(5000);
     }
 
     async llenarDatosPersonales(cliente) {

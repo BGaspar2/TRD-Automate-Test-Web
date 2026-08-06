@@ -16,7 +16,7 @@ export class HomePage {
         this.sinUbicacion = page.locator('.MissingLocationMessage, [class*="MissingLocation"], [class*="no-location"]');
         this.conUbicacion = page.locator('.DeliveryAddressMessage, [class*="DeliveryAddress"], [class*="address-message"]');
 
-        this.searchInput = page.getByPlaceholder(/buscar dirección|dirección|ubicación|address/i)
+        this.searchInput = page.getByPlaceholder(/buscar dirección|dirección|ubicación|address|endereço/i)
             .or(page.locator('input[placeholder*="dirección"], input[placeholder*="Dirección"], input[type="search"]'));
 
         this.botonConfirmar = page.getByRole('button', { name: /confirmar|aceptar/i })

@@ -7,7 +7,6 @@ export class MenuPage {
     constructor(page) {
         this.page = page;
 
-        // Locators resilientes con fallbacks
         this.categorias = page.locator('.CategoriesGrid a figure, .CategoriesGrid a, [class*="CategoriesGrid"] a');
         this.tarjetasProductos = page.locator('.ProductCard, [class*="ProductCard"], [data-testid^="product-"]');
         this.contenedorTotales = page.locator('.ProductTotals, [class*="ProductTotals"], [class*="totals"]');
@@ -47,7 +46,6 @@ export class MenuPage {
         const tarjeta = this.tarjetasProductos.nth(indiceAleatorio);
         await tarjeta.scrollIntoViewIfNeeded().catch(() => {});
 
-        // Estrategia de detección de botón: texto "Agregar/Añadir/+", ícono SVG feather-plus, botón CSS o tarjeta directa
         let btnAgregar = tarjeta.locator('button').filter({ hasText: /agregar|añadir|\+/i }).first();
         if (!(await btnAgregar.isVisible({ timeout: 1500 }).catch(() => false))) {
             btnAgregar = tarjeta.locator('button:has(svg.feather-plus), button.Button, [role="button"]').first();

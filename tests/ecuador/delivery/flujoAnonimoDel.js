@@ -1,11 +1,11 @@
 import { test } from '@playwright/test';
-import { testData } from './data/testData.js';
-import { HomePage } from './pages/HomePage.js';
-import { MenuPage } from './pages/MenuPage.js';
-import { CartPage } from './pages/CartPage.js';
-import { CheckoutPage } from './pages/CheckoutPage.js';
+import { testData } from '../data/testData.js';
+import { HomePage } from '../pages/HomePage.js';
+import { MenuPage } from '../pages/MenuPage.js';
+import { CartPage } from '../pages/CartPage.js';
+import { CheckoutPage } from '../pages/CheckoutPage.js';
 
-test('Flujo E2E - Compra a domicilio usuario anónimo (Colombia)', async ({ page }) => {
+test('Flujo E2E - Compra a domicilio usuario anónimo (Ecuador)', async ({ page }) => {
     const homePage = new HomePage(page);
     const menuPage = new MenuPage(page);
     const cartPage = new CartPage(page);

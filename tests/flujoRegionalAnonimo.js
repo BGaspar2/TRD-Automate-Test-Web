@@ -1,5 +1,8 @@
 import { test } from '@playwright/test';
 
+// Configurar ejecución secuencial (serial)
+test.describe.configure({ mode: 'serial' });
+
 // 🇪🇨 ECUADOR
 import { testData as testDataEC } from './ecuador/data/testData.js';
 import { HomePage as HomePageEC } from './ecuador/pages/HomePage.js';

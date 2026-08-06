@@ -71,10 +71,22 @@ export class MenuPage {
         console.log(`Paso 1: Aumentando cantidad de ${cantidadActual} a ${cantidadDeseada}...`);
 
         const sumarBtn = this.btnSumar.first();
-        while (cantidadActual < cantidadDeseada) {
-            await sumarBtn.click();
-            await this.page.waitForTimeout(300);
-            cantidadActual = parseInt(await contador.innerText());
+
+        if (await sumarBtn.isDisabled().catch(() => false)) {
+            console.log("El botón '+' está deshabilitado. Seleccionando modificadores obligatorios...");
+            await this.validarYSeleccionarModificadores();
+        }
+
+        let reintentos = 0;
+        while (cantidadActual < cantidadDeseada && reintentos < 10) {
+            if (await sumarBtn.isEnabled().catch(() => false)) {
+                await sumarBtn.click();
+                await this.page.waitForTimeout(300);
+                cantidadActual = parseInt(await contador.innerText());
+            } else {
+                await this.validarYSeleccionarModificadores();
+            }
+            reintentos++;
         }
     }
 

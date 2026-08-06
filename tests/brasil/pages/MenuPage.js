@@ -7,7 +7,6 @@ export class MenuPage {
     constructor(page) {
         this.page = page;
 
-        // Locators resilientes con fallbacks
         this.categorias = page.locator('.CategoriesGrid a figure, .CategoriesGrid a, [class*="CategoriesGrid"] a');
         this.tarjetasProductos = page.locator('.ProductCard, [class*="ProductCard"], [data-testid^="product-"]');
         this.contenedorTotales = page.locator('.ProductTotals, [class*="ProductTotals"], [class*="totals"]');
@@ -18,7 +17,7 @@ export class MenuPage {
         this.contadorTexto = page.locator('.ProductTotals .Counter__quantity, [class*="quantity"], [class*="Counter__quantity"]');
 
         this.btnAgregarCarrito = page.getByTestId('add-to-cart')
-            .or(page.getByRole('button', { name: /agregar al carrito|añadir al carrito|confirmar/i }))
+            .or(page.getByRole('button', { name: /agregar al carrito|añadir al carrito|adicionar|confirmar/i }))
             .or(page.locator('button[data-testid="add-to-cart"]'));
 
         this.gruposModificadores = page.locator('.ProductForm .ModifiersGroup, [class*="ModifiersGroup"], [class*="ModifierGroup"]');
@@ -47,8 +46,7 @@ export class MenuPage {
         const tarjeta = this.tarjetasProductos.nth(indiceAleatorio);
         await tarjeta.scrollIntoViewIfNeeded().catch(() => {});
 
-        // Estrategia de detección de botón: texto "Agregar/Añadir/+", ícono SVG feather-plus, botón CSS o tarjeta directa
-        let btnAgregar = tarjeta.locator('button').filter({ hasText: /agregar|añadir|\+/i }).first();
+        let btnAgregar = tarjeta.locator('button').filter({ hasText: /agregar|añadir|adicionar|\+/i }).first();
         if (!(await btnAgregar.isVisible({ timeout: 1500 }).catch(() => false))) {
             btnAgregar = tarjeta.locator('button:has(svg.feather-plus), button.Button, [role="button"]').first();
         }
@@ -130,7 +128,7 @@ export class MenuPage {
         console.log("Paso 2: Confirmando y agregando al carrito...");
         let btn = this.btnAgregarCarrito.first();
         if (!(await btn.isVisible({ timeout: 2000 }).catch(() => false))) {
-            btn = this.contenedorTotales.locator('button').filter({ hasText: /agregar|añadir|confirmar/i }).first();
+            btn = this.contenedorTotales.locator('button').filter({ hasText: /agregar|añadir|adicionar|confirmar/i }).first();
         }
         await expect(btn).toBeVisible();
         await btn.click();

@@ -5,12 +5,18 @@
   "main": "index.js",
   "scripts": {
     "test": "playwright test",
-    "test:regional": "playwright test tests/flujoRegionalAnonimo.js --headed --fully-parallel --workers=4",
-    "test:regional:headless": "playwright test tests/flujoRegionalAnonimo.js --fully-parallel --workers=4",
-    "test:ecuador": "playwright test tests/ecuador/flujoAnonimoDel.js --headed",
-    "test:chile": "playwright test tests/chile/flujoAnonimoDel.js --headed",
-    "test:colombia": "playwright test tests/colombia/flujoAnonimoDel.js --headed",
-    "test:venezuela": "playwright test tests/venezuela/flujoAnonimoDel.js --headed"
+    "test:regional": "playwright test tests/flujoRegionalAnonimo.js --headed --workers=1",
+    "test:regional:headless": "playwright test tests/flujoRegionalAnonimo.js --workers=1",
+    "test:ecuador": "playwright test tests/ecuador/delivery/flujoAnonimoDel.js --headed",
+    "test:ecuador:pickup": "playwright test tests/ecuador/pickup/flujoAnonimoPickup.js --headed",
+    "test:chile": "playwright test tests/chile/delivery/flujoAnonimoDel.js --headed",
+    "test:chile:pickup": "playwright test tests/chile/pickup/flujoAnonimoPickup.js --headed",
+    "test:colombia": "playwright test tests/colombia/delivery/flujoAnonimoDel.js --headed",
+    "test:colombia:pickup": "playwright test tests/colombia/pickup/flujoAnonimoPickup.js --headed",
+    "test:venezuela": "playwright test tests/venezuela/delivery/flujoAnonimoDel.js --headed",
+    "test:venezuela:pickup": "playwright test tests/venezuela/pickup/flujoAnonimoPickup.js --headed",
+    "test:brasil:pickup": "playwright test tests/brasil/pickup/flujoAnonimoPickup.js --headed",
+    "test:argentina:pickup": "playwright test tests/argentina/pickup/flujoAnonimoPickup.js --headed"
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",

@@ -11,6 +11,9 @@ export class HomePage {
         this.botonDomicilio = page.getByRole('button', { name: /domicilio|delivery|entrega/i })
             .or(page.locator('button.Button, button, [role="button"]').filter({ hasText: /domicilio|delivery|entrega/i }));
 
+        this.botonPickup = page.getByRole('button', { name: /pickup|retiro|para llevar|recoge|recoger|retirar|tienda/i })
+            .or(page.locator('button.Button, button, [role="button"]').filter({ hasText: /pickup|retiro|para llevar|recoge|recoger|retirar|tienda/i }));
+
         this.sinUbicacion = page.locator('.MissingLocationMessage, [class*="MissingLocation"], [class*="no-location"]');
         this.conUbicacion = page.locator('.DeliveryAddressMessage, [class*="DeliveryAddress"], [class*="address-message"]');
 
@@ -33,6 +36,19 @@ export class HomePage {
         await btn.waitFor({ state: 'visible', timeout: 10000 });
         await btn.click();
         await this.page.waitForTimeout(5000);
+    }
+
+    async seleccionarCanalPickup() {
+        console.log("Seleccionando canal de compra: Pickup (Retiro en tienda)...");
+        const btn = this.botonPickup.first();
+        const esVisible = await btn.isVisible({ timeout: 5000 }).catch(() => false);
+        if (esVisible) {
+            await btn.click();
+            console.log("Canal Pickup seleccionado con éxito.");
+        } else {
+            console.log("El canal Pickup no se encuentra disponible en la página principal para este país.");
+        }
+        await this.page.waitForTimeout(3000);
     }
 
     async configurarUbicacion(searchQuery, fullAddress) {
