@@ -101,6 +101,33 @@ test.describe('Suite Regional LATAM - Flujo Compra Anónima (AR, BR, CL, CO, EC,
         await page.waitForTimeout(3000);
     });
 
+    test('🇪🇨 Ecuador - Compra en Pickup usuario anónimo', async ({ page }) => {
+        const homePage = new HomePageEC(page);
+        const menuPage = new MenuPageEC(page);
+        const cartPage = new CartPageEC(page);
+        const checkoutPage = new CheckoutPageEC(page);
+
+        await homePage.navegar(testDataEC.baseUrl);
+        await homePage.seleccionarCanalPickup(testDataEC.location.searchQuery, testDataEC.location.fullAddress);
+
+        await menuPage.seleccionarCategoriaAleatoria();
+        await menuPage.seleccionarProductoAleatorio();
+        await menuPage.ajustarCantidad(testDataEC.order.desiredQuantity);
+        await menuPage.validarYSeleccionarModificadores();
+        await menuPage.agregarAlCarrito(testDataEC.order.desiredQuantity);
+
+        await cartPage.procesarModalCarrito();
+        await cartPage.validarYAjustarMontoCarrito();
+        await cartPage.irAPagar();
+
+        await checkoutPage.iniciarCompletar();
+        await checkoutPage.llenarDatosPersonales(testDataEC.customer);
+        await checkoutPage.seleccionarMetodoPago(testDataEC.paymentMethodId);
+
+        console.log("Flujo Ecuador Pickup finalizado con éxito.");
+        await page.waitForTimeout(3000);
+    });
+
     test('🇪🇨 Ecuador - Compra a domicilio usuario anónimo', async ({ page }) => {
         const homePage = new HomePageEC(page);
         const menuPage = new MenuPageEC(page);
@@ -126,7 +153,34 @@ test.describe('Suite Regional LATAM - Flujo Compra Anónima (AR, BR, CL, CO, EC,
         await checkoutPage.llenarDatosPersonales(testDataEC.customer);
         await checkoutPage.seleccionarMetodoPago(testDataEC.paymentMethodId);
 
-        console.log("Flujo Ecuador finalizado con éxito.");
+        console.log("Flujo Ecuador Delivery finalizado con éxito.");
+        await page.waitForTimeout(3000);
+    });
+
+    test('🇨🇱 Chile - Compra en Pickup usuario anónimo', async ({ page }) => {
+        const homePage = new HomePageCL(page);
+        const menuPage = new MenuPageCL(page);
+        const cartPage = new CartPageCL(page);
+        const checkoutPage = new CheckoutPageCL(page);
+
+        await homePage.navegar(testDataCL.baseUrl);
+        await homePage.seleccionarCanalPickup(testDataCL.location.searchQuery, testDataCL.location.fullAddress);
+
+        await menuPage.seleccionarCategoriaAleatoria();
+        await menuPage.seleccionarProductoAleatorio();
+        await menuPage.ajustarCantidad(testDataCL.order.desiredQuantity);
+        await menuPage.validarYSeleccionarModificadores();
+        await menuPage.agregarAlCarrito(testDataCL.order.desiredQuantity);
+
+        await cartPage.procesarModalCarrito();
+        await cartPage.validarYAjustarMontoCarrito();
+        await cartPage.irAPagar();
+
+        await checkoutPage.iniciarCompletar();
+        await checkoutPage.llenarDatosPersonales(testDataCL.customer);
+        await checkoutPage.seleccionarMetodoPago(testDataCL.paymentMethodId);
+
+        console.log("Flujo Chile Pickup finalizado con éxito.");
         await page.waitForTimeout(3000);
     });
 
@@ -155,7 +209,34 @@ test.describe('Suite Regional LATAM - Flujo Compra Anónima (AR, BR, CL, CO, EC,
         await checkoutPage.llenarDatosPersonales(testDataCL.customer);
         await checkoutPage.seleccionarMetodoPago(testDataCL.paymentMethodId);
 
-        console.log("Flujo Chile finalizado con éxito.");
+        console.log("Flujo Chile Delivery finalizado con éxito.");
+        await page.waitForTimeout(3000);
+    });
+
+    test('🇨🇴 Colombia - Compra en Pickup usuario anónimo', async ({ page }) => {
+        const homePage = new HomePageCO(page);
+        const menuPage = new MenuPageCO(page);
+        const cartPage = new CartPageCO(page);
+        const checkoutPage = new CheckoutPageCO(page);
+
+        await homePage.navegar(testDataCO.baseUrl);
+        await homePage.seleccionarCanalPickup(testDataCO.location.searchQuery, testDataCO.location.fullAddress);
+
+        await menuPage.seleccionarCategoriaAleatoria();
+        await menuPage.seleccionarProductoAleatorio();
+        await menuPage.ajustarCantidad(testDataCO.order.desiredQuantity);
+        await menuPage.validarYSeleccionarModificadores();
+        await menuPage.agregarAlCarrito(testDataCO.order.desiredQuantity);
+
+        await cartPage.procesarModalCarrito();
+        await cartPage.validarYAjustarMontoCarrito();
+        await cartPage.irAPagar();
+
+        await checkoutPage.iniciarCompletar();
+        await checkoutPage.llenarDatosPersonales(testDataCO.customer);
+        await checkoutPage.seleccionarMetodoPago(testDataCO.paymentMethodId);
+
+        console.log("Flujo Colombia Pickup finalizado con éxito.");
         await page.waitForTimeout(3000);
     });
 
@@ -184,7 +265,7 @@ test.describe('Suite Regional LATAM - Flujo Compra Anónima (AR, BR, CL, CO, EC,
         await checkoutPage.llenarDatosPersonales(testDataCO.customer);
         await checkoutPage.seleccionarMetodoPago(testDataCO.paymentMethodId);
 
-        console.log("Flujo Colombia finalizado con éxito.");
+        console.log("Flujo Colombia Delivery finalizado con éxito.");
         await page.waitForTimeout(3000);
     });
 
