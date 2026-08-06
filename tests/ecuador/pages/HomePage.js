@@ -220,4 +220,12 @@ export class HomePage {
             await this.verificarLocalesCerrados();
 
             const btnConfirmar = this.botonConfirmar.first();
+            if (await btnConfirmar.isVisible({ timeout: 5000 }).catch(() => false)) {
+                await btnConfirmar.click();
+                await this.page.waitForTimeout(3000);
+                await this.verificarLocalesCerrados();
+            }
+            await this.page.waitForTimeout(3000);
+        }
+    }
 }

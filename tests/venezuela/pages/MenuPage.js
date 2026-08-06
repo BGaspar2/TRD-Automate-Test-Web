@@ -134,14 +134,14 @@ export class MenuPage {
                 console.log(`Falta seleccionar en "${titulo}" (faltan ${faltantes} opciones). Seleccionando...`);
 
                 for (let k = 0; k < faltantes; k++) {
-                    const radioOption = grupo.locator('.RadioModifier label, input[type="radio"] + label, label').nth(k);
+                    const radioOption = grupo.locator('.RadioModifier label, label').nth(k);
                     if (await radioOption.isVisible({ timeout: 1000 }).catch(() => false)) {
                         await radioOption.click().catch(() => {});
                         await this.page.waitForTimeout(300);
                         continue;
                     }
 
-                    const plusBtn = grupo.locator('.CounterModifier button:has(svg.feather-plus), button:has(svg.feather-plus), button:has-text("+")').first();
+                    const plusBtn = grupo.locator('.CounterModifier button, button:has-text("+")').first();
                     if (await plusBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
                         await plusBtn.click().catch(() => {});
                         await this.page.waitForTimeout(300);
