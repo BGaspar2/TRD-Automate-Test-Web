@@ -107,28 +107,50 @@ export class MenuPage {
             const grupo = this.gruposModificadores.nth(i);
             const titulo = await grupo.locator('h3, h4, [class*="title"]').first().innerText().catch(() => `Grupo ${i + 1}`);
             const contadorElemento = grupo.locator('.ReadonlyCounter, [class*="Counter"], [class*="counter"]').first();
+            const mensajeError = grupo.locator('[class*="danger"], [class*="error"], p:has-text("Debes escoger"), p:has-text("escoger")').first();
+
+            let requiereSeleccion = false;
+            let faltantes = 1;
 
             if (await contadorElemento.isVisible({ timeout: 1500 }).catch(() => false)) {
                 const textoContador = await contadorElemento.innerText();
+                const match = textoContador.match(/(\d+)\s*\/\s*(\d+)/);
 
-                if (textoContador.includes('0 /') || textoContador.startsWith('0')) {
-                    console.log(`Falta seleccionar en: "${titulo}". Eligiendo primera opción...`);
+                if (match) {
+                    const actual = parseInt(match[1]);
+                    const requerido = parseInt(match[2]);
+                    if (actual < requerido) {
+                        requiereSeleccion = true;
+                        faltantes = requerido - actual;
+                    }
+                } else if (textoContador.includes('0 /') || textoContador.startsWith('0')) {
+                    requiereSeleccion = true;
+                    faltantes = 1;
+                }
+            } else if (await mensajeError.isVisible({ timeout: 1000 }).catch(() => false)) {
+                requiereSeleccion = true;
+                faltantes = 1;
+            }
 
-                    const primerRadio = grupo.locator('.RadioModifier label, input[type="radio"] + label, label').first();
-                    if (await primerRadio.isVisible({ timeout: 1000 }).catch(() => false)) {
-                        await primerRadio.click();
-                        await this.page.waitForTimeout(200);
+            if (requiereSeleccion) {
+                console.log(`Falta seleccionar en "${titulo}" (faltan ${faltantes} opciones). Seleccionando...`);
+
+                for (let k = 0; k < faltantes; k++) {
+                    const radioOption = grupo.locator('.RadioModifier label, input[type="radio"] + label, label').nth(k);
+                    if (await radioOption.isVisible({ timeout: 1000 }).catch(() => false)) {
+                        await radioOption.click().catch(() => {});
+                        await this.page.waitForTimeout(300);
                         continue;
                     }
 
-                    const primerBotonMas = grupo.locator('.CounterModifier button:has(svg.feather-plus), button:has(svg.feather-plus), button:has-text("+")').first();
-                    if (await primerBotonMas.isVisible({ timeout: 1000 }).catch(() => false)) {
-                        await primerBotonMas.click();
-                        await this.page.waitForTimeout(200);
+                    const plusBtn = grupo.locator('.CounterModifier button:has(svg.feather-plus), button:has(svg.feather-plus), button:has-text("+")').first();
+                    if (await plusBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+                        await plusBtn.click().catch(() => {});
+                        await this.page.waitForTimeout(300);
                     }
-                } else {
-                    console.log(`Modificador listo en: "${titulo}" (${textoContador.replace(/\n/g, '')}).`);
                 }
+            } else {
+                console.log(`Modificador listo en: "${titulo}".`);
             }
         }
     }

@@ -105,34 +105,19 @@ export class MenuPage {
             const grupo = this.gruposModificadores.nth(i);
             const titulo = await grupo.locator('h3, h4, [class*="title"]').first().innerText().catch(() => `Grupo ${i + 1}`);
             const contadorElemento = grupo.locator('.ReadonlyCounter, [class*="Counter"], [class*="counter"]').first();
+            const mensajeError = grupo.locator('[class*="danger"], [class*="error"], p:has-text("Debes escoger"), p:has-text("escoger")').first();
+
+            let requiereSeleccion = false;
+            let faltantes = 1;
 
             if (await contadorElemento.isVisible({ timeout: 1500 }).catch(() => false)) {
-                let textoContador = await contadorElemento.innerText();
-                let numeros = textoContador.match(/\d+/g);
+                const textoContador = await contadorElemento.innerText();
+                const match = textoContador.match(/(\d+)\s*\/\s*(\d+)/);
 
-                if (numeros && numeros.length >= 2) {
-                    let actual = parseInt(numeros[0]);
-                    let requerido = parseInt(numeros[1]);
-
+                if (match) {
+                    const actual = parseInt(match[1]);
+                    const requerido = parseInt(match[2]);
                     if (actual < requerido) {
-                        console.log(`Falta seleccionar en: "${titulo}" (${textoContador.replace(/\n/g, '')}). Seleccionando opciones necesarias (${actual}/${requerido})...`);
-                        let intentos = 0;
-                        while (actual < requerido && intentos < 10) {
-                            intentos++;
-                            let clicHecho = false;
-
-                            const botonesMas = grupo.locator('.CounterModifier button:has(svg.feather-plus), button:has(svg.feather-plus)');
-                            const totalMas = await botonesMas.count();
-                            if (totalMas > 0) {
-                                const ind = Math.min(actual, totalMas - 1);
-                                if (await botonesMas.nth(ind).isVisible()) {
-                                    await botonesMas.nth(ind).click();
-                                    await this.page.waitForTimeout(300);
-                                    clicHecho = true;
-                                }
-                            }
-
-                            if (!clicHecho) {
                                 const opciones = grupo.locator('.RadioModifier label, .CheckboxModifier label, label');
                                 const totalOpciones = await opciones.count();
                                 if (totalOpciones > 0) {
