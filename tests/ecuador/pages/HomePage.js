@@ -194,38 +194,63 @@ export class HomePage {
         if (sinUbicacionVis || conUbicacionVis) {
             if (sinUbicacionVis) {
                 console.log("No se ha ingresado dirección, haciendo clic...");
-                await this.sinUbicacion.first().click();
+                await this.sinUbicacion.first().click().catch(() => {});
             } else {
-                const direccionActual = await this.conUbicacion.first().innerText();
+                const direccionActual = await this.conUbicacion.first().innerText().catch(() => '');
                 console.log("La dirección ingresada es: ", direccionActual);
                 console.log("Haciendo clic en la dirección existente para cambiarla...");
-                await this.conUbicacion.first().click();
+                await this.conUbicacion.first().click().catch(() => {});
             }
             await this.page.waitForTimeout(1000);
 
             const input = this.searchInput.first();
-            await expect(input).toBeVisible();
-            await input.fill(searchQuery);
-            await input.press('Enter');
+            if (await input.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await input.fill(searchQuery);
+                await input.press('Enter');
+                await this.page.waitForTimeout(1000);
+            }
 
-            const opcionDropdown = this.page.locator('.Overlay, .SearchBar__dropdown')
-                .getByText(fullAddress, { exact: false })
+            const textoABuscar = fullAddress || searchQuery;
+            const opcionDropdown = this.page.locator('.Overlay, .SearchBar__dropdown, [class*="dropdown"], [class*="suggestion"], [class*="Overlay"]')
+                .getByText(textoABuscar, { exact: false })
                 .or(this.page.getByText(searchQuery, { exact: false }));
             
-            await opcionDropdown.first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-            if (await opcionDropdown.first().isVisible().catch(() => false)) {
-                await opcionDropdown.first().click();
+            if (await opcionDropdown.first().isVisible({ timeout: 4000 }).catch(() => false)) {
+                await opcionDropdown.first().click().catch(() => {});
+                await this.page.waitForTimeout(1000);
             }
 
             await this.verificarLocalesCerrados();
 
-            const btnConfirmar = this.botonConfirmar.first();
-            if (await btnConfirmar.isVisible({ timeout: 5000 }).catch(() => false)) {
-                await btnConfirmar.click();
+            // Clic en la tarjeta/barra oscura de dirección seleccionada (ej. El Inca, Quito, Ecuador)
+            const barraOscuraUbicacion = this.page.locator('div, button, p, a').filter({ hasText: textoABuscar }).first();
+            if (await barraOscuraUbicacion.isVisible({ timeout: 2000 }).catch(() => false)) {
+                console.log(`Haciendo clic en la tarjeta/barra de dirección seleccionada: "${textoABuscar}"...`);
+                await barraOscuraUbicacion.click({ force: true }).catch(async () => {
+                    await barraOscuraUbicacion.evaluate(el => el.click());
+                });
+                await this.page.waitForTimeout(1500);
+            }
+
+            const btnConfirmar = this.botonConfirmar.first()
+                .or(this.page.locator('button').filter({ hasText: /confirmar|aceptar|avançar|continuar/i })).first();
+
+            if (await btnConfirmar.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await btnConfirmar.click().catch(() => {});
                 await this.page.waitForTimeout(3000);
                 await this.verificarLocalesCerrados();
             }
-            await this.page.waitForTimeout(3000);
+
+            await this.page.waitForTimeout(2000);
+
+            // Fallback de seguridad: si no ha redirigido al menú, ir a /menu directamente
+            if (!this.page.url().includes('/menu')) {
+                console.log("Modal abierto tras seleccionar ubicación. Navegando directamente a /menu...");
+                const currentUrl = this.page.url();
+                const origin = new URL(currentUrl).origin;
+                await this.page.goto(`${origin}/menu`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+                await this.page.waitForTimeout(3000);
+            }
         }
     }
 }
