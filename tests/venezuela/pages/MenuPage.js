@@ -104,44 +104,49 @@ export class MenuPage {
         for (let i = 0; i < totalGrupos; i++) {
             const grupo = this.gruposModificadores.nth(i);
             const titulo = await grupo.locator('h3, h4, [class*="title"]').first().innerText().catch(() => `Grupo ${i + 1}`);
+            const textoGrupo = await grupo.innerText().catch(() => '');
+
+            // Si el grupo es opcional ("Hasta X opciones", "Até X opções", "opcional"), NO es obligatorio completar el máximo.
+            if (/hasta \d+|até \d+|opcional|pode selecionar/i.test(textoGrupo)) {
+                console.log(`Grupo opcional detectado: "${titulo}". Se omite autocompletado.`);
+                continue;
+            }
+
             const contadorElemento = grupo.locator('.ReadonlyCounter, [class*="Counter"], [class*="counter"]').first();
-            const mensajeError = grupo.locator('[class*="danger"], [class*="error"], p:has-text("Debes escoger"), p:has-text("escoger")').first();
+            const mensajeError = grupo.locator('[class*="danger"], [class*="error"], p:has-text("Debes escoger"), p:has-text("escoger"), p:has-text("Obrigatório")').first();
 
             let requiereSeleccion = false;
             let faltantes = 1;
 
-            if (await contadorElemento.isVisible({ timeout: 1500 }).catch(() => false)) {
+            if (await mensajeError.isVisible({ timeout: 1000 }).catch(() => false)) {
+                requiereSeleccion = true;
+                faltantes = 1;
+            } else if (await contadorElemento.isVisible({ timeout: 1500 }).catch(() => false)) {
                 const textoContador = await contadorElemento.innerText();
                 const match = textoContador.match(/(\d+)\s*\/\s*(\d+)/);
 
                 if (match) {
                     const actual = parseInt(match[1]);
                     const requerido = parseInt(match[2]);
-                    if (actual < requerido) {
+                    if (actual < requerido && actual === 0) {
                         requiereSeleccion = true;
                         faltantes = requerido - actual;
                     }
-                } else if (textoContador.includes('0 /') || textoContador.startsWith('0')) {
-                    requiereSeleccion = true;
-                    faltantes = 1;
                 }
-            } else if (await mensajeError.isVisible({ timeout: 1000 }).catch(() => false)) {
-                requiereSeleccion = true;
-                faltantes = 1;
             }
 
             if (requiereSeleccion) {
                 console.log(`Falta seleccionar en "${titulo}" (faltan ${faltantes} opciones). Seleccionando...`);
 
                 for (let k = 0; k < faltantes; k++) {
-                    const radioOption = grupo.locator('.RadioModifier label, label').nth(k);
+                    const radioOption = grupo.locator('.RadioModifier label, .CheckboxModifier label, input[type="radio"] + label').nth(k);
                     if (await radioOption.isVisible({ timeout: 1000 }).catch(() => false)) {
                         await radioOption.click().catch(() => {});
                         await this.page.waitForTimeout(300);
                         continue;
                     }
 
-                    const plusBtn = grupo.locator('.CounterModifier button, button:has-text("+")').first();
+                    const plusBtn = grupo.locator('.CounterModifier button:has(svg.feather-plus), button:has-text("+")').first();
                     if (await plusBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
                         await plusBtn.click().catch(() => {});
                         await this.page.waitForTimeout(300);
