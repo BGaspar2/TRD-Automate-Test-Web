@@ -77,8 +77,8 @@ export class CartPage {
 
         if (modalVis) {
             console.log("Modal de producto añadido detectado.");
-            const btnVerCarrito = modal.getByRole('button', { name: /ver carrito|ir al carrito|carrito/i })
-                .or(modal.locator('button, a').filter({ hasText: /carrito/i })).first();
+            const btnVerCarrito = modal.getByRole('button', { name: /ver carrito|ir al carrito|carrinho|ver carrinho|ir para o carrinho/i })
+                .or(modal.locator('button, a').filter({ hasText: /carrito|carrinho/i })).first();
             
             await btnVerCarrito.click().catch(() => {});
             console.log("Navegando al carrito desde el modal...");
@@ -94,12 +94,10 @@ export class CartPage {
     }
 
     async irAPagar() {
-        console.log("Navegando al checkout ('Ir a pagar')...");
+        console.log("Navegando al checkout ('Ir a pagar' / 'Ir para o pagamento')...");
 
-        // En la app de KFC existen dos botones OrderTotal (uno para vista móvil y otro para desktop).
-        // Filtramos para seleccionar dinámicamente el botón que esté VISIBLE en la pantalla actual.
-        const candidatos = this.page.locator('.OrderTotal, button:has-text("Ir a pagar"), a:has-text("Ir a pagar"), button[type="submit"]')
-            .filter({ hasText: /ir a pagar|pagar|proceder al pago|checkout/i });
+        const candidatos = this.page.locator('.OrderTotal, button:has-text("Ir a pagar"), a:has-text("Ir a pagar"), button:has-text("Ir para o pagamento"), button[type="submit"]')
+            .filter({ hasText: /ir a pagar|pagar|proceder|finalizar|checkout|ir para o pagamento|pagamento|fazer pedido|concluir/i });
             
         const count = await candidatos.count();
         let btnVisible = null;
@@ -118,7 +116,9 @@ export class CartPage {
         }
 
         await btnVisible.scrollIntoViewIfNeeded().catch(() => {});
-        await btnVisible.click();
+        await btnVisible.click({ force: true }).catch(async () => {
+            await btnVisible.evaluate(b => b.click());
+        });
         await this.page.waitForTimeout(5000);
     }
 }
