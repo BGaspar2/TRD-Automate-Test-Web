@@ -188,69 +188,79 @@ export class HomePage {
     }
 
     async configurarUbicacion(searchQuery, fullAddress) {
-        const sinUbicacionVis = await this.sinUbicacion.first().isVisible({ timeout: 5000 }).catch(() => false);
-        const conUbicacionVis = await this.conUbicacion.first().isVisible({ timeout: 5000 }).catch(() => false);
+        console.log("Configurando ubicación para entrega a domicilio...");
 
-        if (sinUbicacionVis || conUbicacionVis) {
-            if (sinUbicacionVis) {
-                console.log("No se ha ingresado dirección, haciendo clic...");
-                await this.sinUbicacion.first().click().catch(() => {});
-            } else {
-                const direccionActual = await this.conUbicacion.first().innerText().catch(() => '');
-                console.log("La dirección ingresada es: ", direccionActual);
-                console.log("Haciendo clic en la dirección existente para cambiarla...");
-                await this.conUbicacion.first().click().catch(() => {});
-            }
-            await this.page.waitForTimeout(1000);
+        // 1. Si el modal ya está abierto (el buscador es visible), no hace falta hacer clic en el botón del encabezado
+        const input = this.searchInput.first();
+        let inputVis = await input.isVisible({ timeout: 3000 }).catch(() => false);
 
-            const input = this.searchInput.first();
-            if (await input.isVisible({ timeout: 3000 }).catch(() => false)) {
-                await input.fill(searchQuery);
-                await input.press('Enter');
-                await this.page.waitForTimeout(1000);
-            }
+        if (!inputVis) {
+            const btnAbrirUbicacion = this.page.getByText(/ingresa tu ubicación|ingresa tu ubicacion|ingresar dirección|selecciona tu ubicación|seleccionar ubicación|endereço/i)
+                .or(this.sinUbicacion)
+                .or(this.conUbicacion).first();
 
-            const textoABuscar = fullAddress || searchQuery;
-            const opcionDropdown = this.page.locator('.Overlay, .SearchBar__dropdown, [class*="dropdown"], [class*="suggestion"], [class*="Overlay"]')
-                .getByText(textoABuscar, { exact: false })
-                .or(this.page.getByText(searchQuery, { exact: false }));
-            
-            if (await opcionDropdown.first().isVisible({ timeout: 4000 }).catch(() => false)) {
-                await opcionDropdown.first().click().catch(() => {});
-                await this.page.waitForTimeout(1000);
-            }
-
-            await this.verificarLocalesCerrados();
-
-            // Clic en la tarjeta/barra oscura de dirección seleccionada (ej. El Inca, Quito, Ecuador)
-            const barraOscuraUbicacion = this.page.locator('div, button, p, a').filter({ hasText: textoABuscar }).first();
-            if (await barraOscuraUbicacion.isVisible({ timeout: 2000 }).catch(() => false)) {
-                console.log(`Haciendo clic en la tarjeta/barra de dirección seleccionada: "${textoABuscar}"...`);
-                await barraOscuraUbicacion.click({ force: true }).catch(async () => {
-                    await barraOscuraUbicacion.evaluate(el => el.click());
+            if (await btnAbrirUbicacion.isVisible({ timeout: 5000 }).catch(() => false)) {
+                console.log("Haciendo clic en 'INGRESA TU UBICACIÓN' / Selector de ubicación del encabezado...");
+                await btnAbrirUbicacion.click({ force: true }).catch(async () => {
+                    await btnAbrirUbicacion.evaluate(b => b.click());
                 });
-                await this.page.waitForTimeout(1500);
+                await this.page.waitForTimeout(2000);
             }
+        }
 
-            const btnConfirmar = this.botonConfirmar.first()
-                .or(this.page.locator('button').filter({ hasText: /confirmar|aceptar|avançar|continuar/i })).first();
+        // 2. Llenar el input de búsqueda de dirección
+        if (await input.isVisible({ timeout: 5000 }).catch(() => false)) {
+            console.log(`Escribiendo ubicación: "${searchQuery}"...`);
+            await input.click().catch(() => {});
+            await input.fill(searchQuery);
+            await input.press('Enter');
+            await this.page.waitForTimeout(1500);
+        }
 
-            if (await btnConfirmar.isVisible({ timeout: 3000 }).catch(() => false)) {
-                await btnConfirmar.click().catch(() => {});
-                await this.page.waitForTimeout(3000);
-                await this.verificarLocalesCerrados();
-            }
+        // 3. Seleccionar sugerencia en dropdown
+        const textoABuscar = fullAddress || searchQuery;
+        const opcionDropdown = this.page.locator('.Overlay, .SearchBar__dropdown, [class*="dropdown"], [class*="suggestion"], [class*="Overlay"]')
+            .getByText(textoABuscar, { exact: false })
+            .or(this.page.getByText(searchQuery, { exact: false }));
+        
+        if (await opcionDropdown.first().isVisible({ timeout: 5000 }).catch(() => false)) {
+            console.log(`Seleccionando opción de dirección: "${textoABuscar}"...`);
+            await opcionDropdown.first().click().catch(() => {});
+            await this.page.waitForTimeout(1500);
+        }
 
-            await this.page.waitForTimeout(2000);
+        await this.verificarLocalesCerrados();
 
-            // Fallback de seguridad: si no ha redirigido al menú, ir a /menu directamente
-            if (!this.page.url().includes('/menu')) {
-                console.log("Modal abierto tras seleccionar ubicación. Navegando directamente a /menu...");
-                const currentUrl = this.page.url();
-                const origin = new URL(currentUrl).origin;
-                await this.page.goto(`${origin}/menu`, { waitUntil: 'domcontentloaded' }).catch(() => {});
-                await this.page.waitForTimeout(3000);
-            }
+        // 4. Clic en tarjeta/barra oscura de dirección seleccionada
+        const barraOscuraUbicacion = this.page.locator('div, button, p, a').filter({ hasText: textoABuscar }).first();
+        if (await barraOscuraUbicacion.isVisible({ timeout: 2000 }).catch(() => false)) {
+            console.log(`Haciendo clic en la tarjeta/barra de dirección seleccionada: "${textoABuscar}"...`);
+            await barraOscuraUbicacion.click({ force: true }).catch(async () => {
+                await barraOscuraUbicacion.evaluate(el => el.click());
+            });
+            await this.page.waitForTimeout(1500);
+        }
+
+        // 5. Clic en botón Confirmar si aparece
+        const btnConfirmar = this.botonConfirmar.first()
+            .or(this.page.locator('button').filter({ hasText: /confirmar|aceptar|avançar|continuar/i })).first();
+
+        if (await btnConfirmar.isVisible({ timeout: 3000 }).catch(() => false)) {
+            console.log("Haciendo clic en Confirmar ubicación...");
+            await btnConfirmar.click().catch(() => {});
+            await this.page.waitForTimeout(3000);
+            await this.verificarLocalesCerrados();
+        }
+
+        await this.page.waitForTimeout(2000);
+
+        // 6. Fallback de seguridad: si no ha redirigido al menú, ir a /menu directamente
+        if (!this.page.url().includes('/menu')) {
+            console.log("Navegando directamente a /menu tras seleccionar ubicación de Delivery...");
+            const currentUrl = this.page.url();
+            const origin = new URL(currentUrl).origin;
+            await this.page.goto(`${origin}/menu`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+            await this.page.waitForTimeout(3000);
         }
     }
 }
