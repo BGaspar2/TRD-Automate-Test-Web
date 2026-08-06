@@ -25,6 +25,7 @@ test('Flujo E2E - Compra a domicilio usuario anónimo (Chile)', async ({ page })
 
     // 3. Carrito e Inicio de Pago
     await cartPage.procesarModalCarrito();
+    await cartPage.validarYAjustarMontoCarrito();
     await cartPage.irAPagar();
 
     // 4. Checkout y Confirmación de Datos

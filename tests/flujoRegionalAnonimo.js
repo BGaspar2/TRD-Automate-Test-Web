@@ -28,7 +28,7 @@ import { MenuPage as MenuPageVE } from './venezuela/pages/MenuPage.js';
 import { CartPage as CartPageVE } from './venezuela/pages/CartPage.js';
 import { CheckoutPage as CheckoutPageVE } from './venezuela/pages/CheckoutPage.js';
 
-test.describe.serial('Suite Regional LATAM - Flujo Compra Anónima a Domicilio', () => {
+test.describe('Suite Regional LATAM - Flujo Compra Anónima a Domicilio', () => {
 
     test('🇪🇨 Ecuador - Compra a domicilio usuario anónimo', async ({ page }) => {
         const homePage = new HomePageEC(page);
@@ -47,6 +47,7 @@ test.describe.serial('Suite Regional LATAM - Flujo Compra Anónima a Domicilio',
         await menuPage.agregarAlCarrito(testDataEC.order.desiredQuantity);
 
         await cartPage.procesarModalCarrito();
+        await cartPage.validarYAjustarMontoCarrito();
         await cartPage.irAPagar();
 
         await checkoutPage.iniciarCompletar();
@@ -75,6 +76,7 @@ test.describe.serial('Suite Regional LATAM - Flujo Compra Anónima a Domicilio',
         await menuPage.agregarAlCarrito(testDataCL.order.desiredQuantity);
 
         await cartPage.procesarModalCarrito();
+        await cartPage.validarYAjustarMontoCarrito();
         await cartPage.irAPagar();
 
         await checkoutPage.iniciarCompletar();
@@ -103,6 +105,7 @@ test.describe.serial('Suite Regional LATAM - Flujo Compra Anónima a Domicilio',
         await menuPage.agregarAlCarrito(testDataCO.order.desiredQuantity);
 
         await cartPage.procesarModalCarrito();
+        await cartPage.validarYAjustarMontoCarrito();
         await cartPage.irAPagar();
 
         await checkoutPage.iniciarCompletar();
@@ -131,6 +134,7 @@ test.describe.serial('Suite Regional LATAM - Flujo Compra Anónima a Domicilio',
         await menuPage.agregarAlCarrito(testDataVE.order.desiredQuantity);
 
         await cartPage.procesarModalCarrito();
+        await cartPage.validarYAjustarMontoCarrito();
         await cartPage.irAPagar();
 
         await checkoutPage.iniciarCompletar();

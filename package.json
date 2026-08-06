@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "playwright test",
-    "test:regional": "playwright test tests/flujoRegionalAnonimo.js --headed",
-    "test:regional:headless": "playwright test tests/flujoRegionalAnonimo.js",
+    "test:regional": "playwright test tests/flujoRegionalAnonimo.js --headed --fully-parallel --workers=4",
+    "test:regional:headless": "playwright test tests/flujoRegionalAnonimo.js --fully-parallel --workers=4",
     "test:ecuador": "playwright test tests/ecuador/flujoAnonimoDel.js --headed",
     "test:chile": "playwright test tests/chile/flujoAnonimoDel.js --headed",
     "test:colombia": "playwright test tests/colombia/flujoAnonimoDel.js --headed",
