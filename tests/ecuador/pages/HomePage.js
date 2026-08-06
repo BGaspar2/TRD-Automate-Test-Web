@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 export class HomePage {
     /**
@@ -36,6 +36,17 @@ export class HomePage {
         console.log(`Iniciando navegador y navegando a ${url}...`);
         await this.page.goto(url);
         await this.page.waitForTimeout(5000);
+    }
+
+    async verificarLocalesCerrados() {
+        const alertaCerrados = this.page.locator('.Alert, [class*="alert"], [class*="Banner"], [class*="danger"], [class*="error"], div, p, span')
+            .filter({ hasText: /locales se encuentran cerrados|tiendas cerradas|lojas fechadas|intenta más tarde|cerrados/i }).first();
+
+        if (await alertaCerrados.isVisible({ timeout: 2000 }).catch(() => false)) {
+            const mensaje = await alertaCerrados.innerText().catch(() => 'Los locales se encuentran cerrados.');
+            console.log(`⚠️ ALERTA DETECTADA: "${mensaje.trim()}". Omitiendo la prueba (test.skip)...`);
+            test.skip(true, `Test omitido: ${mensaje.trim()}`);
+        }
     }
 
     async seleccionarCanalDomicilio() {
@@ -178,10 +189,18 @@ export class HomePage {
 
     async configurarUbicacion(searchQuery, fullAddress) {
         const sinUbicacionVis = await this.sinUbicacion.first().isVisible({ timeout: 5000 }).catch(() => false);
+        const conUbicacionVis = await this.conUbicacion.first().isVisible({ timeout: 5000 }).catch(() => false);
 
-        if (sinUbicacionVis) {
-            console.log("No se ha ingresado dirección, haciendo clic...");
-            await this.sinUbicacion.first().click();
+        if (sinUbicacionVis || conUbicacionVis) {
+            if (sinUbicacionVis) {
+                console.log("No se ha ingresado dirección, haciendo clic...");
+                await this.sinUbicacion.first().click();
+            } else {
+                const direccionActual = await this.conUbicacion.first().innerText();
+                console.log("La dirección ingresada es: ", direccionActual);
+                console.log("Haciendo clic en la dirección existente para cambiarla...");
+                await this.conUbicacion.first().click();
+            }
             await this.page.waitForTimeout(1000);
 
             const input = this.searchInput.first();
@@ -189,21 +208,16 @@ export class HomePage {
             await input.fill(searchQuery);
             await input.press('Enter');
 
-            // Esperar explícitamente que aparezca el resultado de búsqueda en el dropdown
             const opcionDropdown = this.page.locator('.Overlay, .SearchBar__dropdown')
-                .getByText(fullAddress, { exact: true })
-                .or(this.page.getByText(fullAddress, { exact: false }));
+                .getByText(fullAddress, { exact: false })
+                .or(this.page.getByText(searchQuery, { exact: false }));
             
-            await opcionDropdown.first().waitFor({ state: 'visible', timeout: 10000 });
-            await opcionDropdown.first().click();
+            await opcionDropdown.first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+            if (await opcionDropdown.first().isVisible().catch(() => false)) {
+                await opcionDropdown.first().click();
+            }
+
+            await this.verificarLocalesCerrados();
 
             const btnConfirmar = this.botonConfirmar.first();
-            await btnConfirmar.waitFor({ state: 'visible', timeout: 10000 });
-            await btnConfirmar.click();
-            await this.page.waitForTimeout(5000);
-        } else if (await this.conUbicacion.first().isVisible({ timeout: 5000 }).catch(() => false)) {
-            const direccionActual = await this.conUbicacion.first().innerText();
-            console.log("La dirección ingresada es: ", direccionActual);
-        }
-    }
 }

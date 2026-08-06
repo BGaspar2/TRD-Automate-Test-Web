@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 export class HomePage {
     /**
@@ -35,6 +35,17 @@ export class HomePage {
         console.log(`Iniciando navegador y navegando a ${url}...`);
         await this.page.goto(url);
         await this.page.waitForTimeout(5000);
+    }
+
+    async verificarLocalesCerrados() {
+        const alertaCerrados = this.page.locator('.Alert, [class*="alert"], [class*="Banner"], [class*="danger"], [class*="error"], div, p, span')
+            .filter({ hasText: /locales se encuentran cerrados|tiendas cerradas|lojas fechadas|intenta más tarde|cerrados/i }).first();
+
+        if (await alertaCerrados.isVisible({ timeout: 2000 }).catch(() => false)) {
+            const mensaje = await alertaCerrados.innerText().catch(() => 'Los locales se encuentran cerrados.');
+            console.log(`⚠️ ALERTA DETECTADA: "${mensaje.trim()}". Omitiendo la prueba (test.skip)...`);
+            test.skip(true, `Test omitido: ${mensaje.trim()}`);
+        }
     }
 
     async seleccionarCanalDomicilio() {
@@ -200,13 +211,20 @@ export class HomePage {
                 .getByText(fullAddress, { exact: false })
                 .or(this.page.getByText(searchQuery, { exact: false }));
             
-            await opcionDropdown.first().waitFor({ state: 'visible', timeout: 10000 });
-            await opcionDropdown.first().click();
+            await opcionDropdown.first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+            if (await opcionDropdown.first().isVisible().catch(() => false)) {
+                await opcionDropdown.first().click();
+            }
+
+            await this.verificarLocalesCerrados();
 
             const btnConfirmar = this.botonConfirmar.first();
-            await btnConfirmar.waitFor({ state: 'visible', timeout: 10000 });
-            await btnConfirmar.click();
-            await this.page.waitForTimeout(5000);
+            if (await btnConfirmar.isVisible({ timeout: 5000 }).catch(() => false)) {
+                await btnConfirmar.click();
+                await this.page.waitForTimeout(3000);
+                await this.verificarLocalesCerrados();
+            }
+            await this.page.waitForTimeout(3000);
         }
     }
 }

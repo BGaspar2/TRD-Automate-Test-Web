@@ -118,30 +118,37 @@ export class MenuPage {
                     const actual = parseInt(match[1]);
                     const requerido = parseInt(match[2]);
                     if (actual < requerido) {
-                                const opciones = grupo.locator('.RadioModifier label, .CheckboxModifier label, label');
-                                const totalOpciones = await opciones.count();
-                                if (totalOpciones > 0) {
-                                    const ind = Math.min(actual, totalOpciones - 1);
-                                    if (await opciones.nth(ind).isVisible()) {
-                                        await opciones.nth(ind).click();
-                                        await this.page.waitForTimeout(300);
-                                        clicHecho = true;
-                                    }
-                                }
-                            }
-
-                            if (!clicHecho) break;
-                            actual++;
-                        }
+                        requiereSeleccion = true;
+                        faltantes = requerido - actual;
                     }
                 } else if (textoContador.includes('0 /') || textoContador.startsWith('0')) {
-                    console.log(`Falta seleccionar en: "${titulo}". Eligiendo primera opción...`);
-                    const primerRadio = grupo.locator('.RadioModifier label, label').first();
-                    if (await primerRadio.isVisible({ timeout: 1000 }).catch(() => false)) {
-                        await primerRadio.click();
-                        await this.page.waitForTimeout(200);
+                    requiereSeleccion = true;
+                    faltantes = 1;
+                }
+            } else if (await mensajeError.isVisible({ timeout: 1000 }).catch(() => false)) {
+                requiereSeleccion = true;
+                faltantes = 1;
+            }
+
+            if (requiereSeleccion) {
+                console.log(`Falta seleccionar en "${titulo}" (faltan ${faltantes} opciones). Seleccionando...`);
+
+                for (let k = 0; k < faltantes; k++) {
+                    const radioOption = grupo.locator('.RadioModifier label, input[type="radio"] + label, label').nth(k);
+                    if (await radioOption.isVisible({ timeout: 1000 }).catch(() => false)) {
+                        await radioOption.click().catch(() => {});
+                        await this.page.waitForTimeout(300);
+                        continue;
+                    }
+
+                    const plusBtn = grupo.locator('.CounterModifier button:has(svg.feather-plus), button:has(svg.feather-plus), button:has-text("+")').first();
+                    if (await plusBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+                        await plusBtn.click().catch(() => {});
+                        await this.page.waitForTimeout(300);
                     }
                 }
+            } else {
+                console.log(`Modificador listo en: "${titulo}".`);
             }
         }
     }
