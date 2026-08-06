@@ -19,8 +19,8 @@ export class HomePage {
         this.sinUbicacion = page.locator('.MissingLocationMessage, [class*="MissingLocation"], [class*="no-location"]');
         this.conUbicacion = page.locator('.DeliveryAddressMessage, [class*="DeliveryAddress"], [class*="address-message"]');
 
-        this.searchInput = page.getByPlaceholder(/buscar dirección|dirección|ubicación|address|endereço|pesquisar|buscar/i)
-            .or(page.locator('input[placeholder*="dirección"], input[placeholder*="Dirección"], input[placeholder*="endereço"], input[placeholder*="Endereço"], input[type="search"]'));
+        this.searchInput = page.locator('.Overlay input, .Modal input, [class*="modal"] input, [class*="Overlay"] input, [class*="SearchBar"] input')
+            .or(page.getByPlaceholder(/ingresa tu dirección|ingresa tu ubicación|buscar dirección|dirección|ubicación|address|endereço/i));
 
         this.botonConfirmar = page.getByRole('button', { name: /confirmar|aceptar|confirmar endereço|avançar/i })
             .or(page.locator('button.Button, button, [role="button"]').filter({ hasText: /confirmar|aceptar|confirmar endereço|avançar/i }));
@@ -190,31 +190,32 @@ export class HomePage {
     async configurarUbicacion(searchQuery, fullAddress) {
         console.log("Configurando ubicación para entrega a domicilio...");
 
-        // 1. Si el modal ya está abierto (el buscador es visible), no hace falta hacer clic en el botón del encabezado
-        const input = this.searchInput.first();
-        let inputVis = await input.isVisible({ timeout: 3000 }).catch(() => false);
+        // 1. Abrir siempre el modal de dirección haciendo clic en 'INGRESA TU UBICACIÓN' / Selector del navbar
+        const btnAbrirUbicacion = this.page.getByText(/ingresa tu ubicación|ingresa tu ubicacion|ingresar dirección|selecciona tu ubicación|seleccionar ubicación|endereço/i)
+            .or(this.sinUbicacion)
+            .or(this.conUbicacion).first();
 
-        if (!inputVis) {
-            const btnAbrirUbicacion = this.page.getByText(/ingresa tu ubicación|ingresa tu ubicacion|ingresar dirección|selecciona tu ubicación|seleccionar ubicación|endereço/i)
-                .or(this.sinUbicacion)
-                .or(this.conUbicacion).first();
-
-            if (await btnAbrirUbicacion.isVisible({ timeout: 5000 }).catch(() => false)) {
-                console.log("Haciendo clic en 'INGRESA TU UBICACIÓN' / Selector de ubicación del encabezado...");
-                await btnAbrirUbicacion.click({ force: true }).catch(async () => {
-                    await btnAbrirUbicacion.evaluate(b => b.click());
-                });
-                await this.page.waitForTimeout(2000);
-            }
+        if (await btnAbrirUbicacion.isVisible({ timeout: 5000 }).catch(() => false)) {
+            console.log("Haciendo clic en 'INGRESA TU UBICACIÓN' / Selector de ubicación del encabezado...");
+            await btnAbrirUbicacion.click({ force: true }).catch(async () => {
+                await btnAbrirUbicacion.evaluate(b => b.click());
+            });
+            await this.page.waitForTimeout(2000);
         }
 
-        // 2. Llenar el input de búsqueda de dirección
-        if (await input.isVisible({ timeout: 5000 }).catch(() => false)) {
-            console.log(`Escribiendo ubicación: "${searchQuery}"...`);
-            await input.click().catch(() => {});
-            await input.fill(searchQuery);
-            await input.press('Enter');
+        // 2. Buscar el input dentro del modal de ubicación (excluyendo el buscador del navbar)
+        const modalInput = this.page.locator('.Overlay input, .Modal input, [class*="modal"] input, [class*="Overlay"] input, [class*="SearchBar"] input')
+            .first()
+            .or(this.searchInput.first());
+
+        if (await modalInput.isVisible({ timeout: 5000 }).catch(() => false)) {
+            console.log(`Escribiendo ubicación en el modal: "${searchQuery}"...`);
+            await modalInput.click().catch(() => {});
+            await modalInput.fill(searchQuery);
+            await modalInput.press('Enter');
             await this.page.waitForTimeout(1500);
+        } else {
+            console.log("⚠️ No se encontró el input del modal de ubicación.");
         }
 
         // 3. Seleccionar sugerencia en dropdown
