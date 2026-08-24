@@ -22,6 +22,28 @@ export const testData = {
         phone: "912345678",
         document: "12345678-9"
     },
+    customerTarjeta: {
+        name: "APRO",
+        lastName: "APRO",
+        email: "juan.perez@example.com",
+        phone: "912345678",
+        document: "12345678-9"
+    },
+    paymentMethods: {
+        tarjeta: "Tarjeta Débito / Crédito",
+        efectivo: "Efectivo"
+    },
+    card: {
+        number: "4013540682746260",
+        numberClean: "4013540682746260",
+        expiry: "01/30",
+        expiryMonth: "01",
+        expiryYear: "2030",
+        expiryFullYear: "2030",
+        cvv: "123",
+        name: "APRO APRO",
+        document: "123456789"
+    },
     paymentMethodId: "#Efectivo",
     registration: {
         baseEmail: process.env.TEST_EMAIL || "bryan.gaspar@trade.ec",

@@ -159,7 +159,8 @@ npm run test:venezuela:registro
 ### 4. 🇨🇱 Chile, 🇦🇷 Argentina y 🇧🇷 Brasil
 
 ```bash
-# Chile
+# Chile (Delivery con Tarjeta y Efectivo, Pickup y Registro):
+npm run test:chile:tarjeta
 npm run test:chile
 npm run test:chile:pickup
 npm run test:chile:registro

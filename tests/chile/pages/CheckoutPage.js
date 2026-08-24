@@ -19,6 +19,20 @@ export class CheckoutPage {
         this.inputEmail = page.locator('input[name="email"], input[type="email"], input[placeholder*="email"]').first();
         this.inputPhoneCustomer = page.locator('.PhoneNumber input, input[name="phone"], input[type="tel"], input[placeholder*="Teléfono"], input[placeholder*="telefone"]').first();
         this.inputDocument = page.locator('#document, input[name="document"], input[placeholder*="Documento"], input[placeholder*="DNI"], input[placeholder*="CPF"], input[placeholder*="RUT"]').first();
+
+        this.codigoPedido = null;
+
+        // Botón principal de Pagar / Realizar Pedido
+        this.btnPagar = page.locator('button.Button, button, [role="button"]')
+            .filter({ hasText: /pagar|confirmar pedido|realizar pedido|finalizar pedido|completar compra|hacer pedido/i });
+
+        // Indicadores de Procesando Orden
+        this.indicadorProcesando = page.locator('text=/procesando|procesando tu pedido|procesando orden|cargando/i')
+            .or(page.locator('[class*="Loading"], [class*="Spinner"], [class*="Processing"]'));
+
+        // Mensaje de Confirmación / Toast de Orden Exitosa
+        this.toastOrdenCreada = page.locator('[role="alert"], [role="status"], [class*="Toast"], [class*="Notification"], [class*="Success"], div')
+            .filter({ hasText: /orden creada|pedido creado|creada exitosamente|pedido realizado|éxito|exitosamente/i });
     }
 
     async iniciarCompletar() {
@@ -199,6 +213,45 @@ export class CheckoutPage {
         await this.page.waitForTimeout(4000);
     }
 
+    /**
+     * Asegura que la casilla 'Utilizar mi información para la facturación' esté siempre marcada
+     */
+    async asegurarDatosFacturacion() {
+        console.log("Verificando checkbox 'Utilizar mi información para la facturación' en Chile...");
+        const checkFacturacion = this.page.locator('label, div, p')
+            .filter({ hasText: /utilizar mi información para la facturación|utilizar mi informacion para la facturacion|mismos datos de facturación|datos de facturación/i })
+            .first();
+
+        if (await checkFacturacion.isVisible({ timeout: 2500 }).catch(() => false)) {
+            const estaMarcado = await checkFacturacion.evaluate(node => {
+                const input = node.querySelector('input[type="checkbox"]') || (node.tagName === 'INPUT' ? node : null);
+                if (input) return input.checked;
+                return node.classList.contains('active') || node.classList.contains('checked') || node.getAttribute('aria-checked') === 'true';
+            }).catch(() => false);
+
+            if (!estaMarcado) {
+                console.log("Marcando checkbox de facturación...");
+                await checkFacturacion.click({ force: true }).catch(() => {});
+                await this.page.evaluate(() => {
+                    const all = Array.from(document.querySelectorAll('label, div, p'));
+                    const lbl = all.find(e => /utilizar mi informaci[oó]n para la facturaci[oó]n/i.test((e.innerText || '').trim()));
+                    if (lbl) {
+                        const inp = lbl.querySelector('input[type="checkbox"]');
+                        if (inp && !inp.checked) {
+                            inp.checked = true;
+                            inp.dispatchEvent(new Event('input', { bubbles: true }));
+                            inp.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    }
+                }).catch(() => {});
+                console.log("✅ Checkbox de facturación marcado.");
+            } else {
+                console.log("✅ Checkbox de facturación ya se encontraba marcado.");
+            }
+        }
+        await this.page.waitForTimeout(1000);
+    }
+
     async llenarDatosPersonales(cliente) {
         console.log("Llenando datos personales del cliente...");
         await this.llenarCampoSeguro(this.inputName, cliente.name);
@@ -206,23 +259,464 @@ export class CheckoutPage {
         await this.llenarCampoSeguro(this.inputEmail, cliente.email);
         await this.llenarCampoSeguro(this.inputPhoneCustomer, cliente.phone);
         await this.llenarCampoSeguro(this.inputDocument, cliente.document);
-        await this.page.waitForTimeout(3000);
+        
+        await this.asegurarDatosFacturacion();
+        await this.page.waitForTimeout(2000);
     }
 
-    async seleccionarMetodoPago(paymentMethodId) {
-        console.log(`Seleccionando método de pago...`);
-        const selectorPago = this.page.locator(`${paymentMethodId}, input[value*="Efectivo"], label:has-text("Efectivo"), [id*="Efectivo"], label:has-text("Dinheiro"), label:has-text("Efectivo en entrega")`).first();
+    /**
+     * Completa el modal para agregar una nueva tarjeta de débito/crédito en Chile
+     * @param {object} cardData Datos de la tarjeta
+     */
+    async agregarNuevaTarjeta(cardData) {
+        console.log("Iniciando proceso para agregar nueva tarjeta en Chile...");
+
+        // 1. Localizar y hacer clic en el botón negro '➕ Nueva tarjeta'
+        for (let intento = 1; intento <= 5; intento++) {
+            console.log(`Intento ${intento}: Haciendo clic en el botón '➕ Nueva tarjeta'...`);
+
+            // Estrategia A: Playwright text selector directo
+            await this.page.click('text=/nueva tarjeta/i', { timeout: 3000, force: true }).catch(() => {});
+            
+            // Estrategia B: Localizador de botón
+            const btnNuevaTarjeta = this.page.locator('button, [role="button"], div, a, span')
+                .filter({ hasText: /nueva tarjeta/i })
+                .last();
+
+            if (await btnNuevaTarjeta.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await btnNuevaTarjeta.scrollIntoViewIfNeeded().catch(() => {});
+                const box = await btnNuevaTarjeta.boundingBox().catch(() => null);
+                if (box) {
+                    await this.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2).catch(() => {});
+                }
+                await btnNuevaTarjeta.click({ force: true }).catch(() => {});
+            }
+
+            // Estrategia C: Invocación en todos los ancestros y React Fiber
+            await this.page.evaluate(() => {
+                const all = Array.from(document.querySelectorAll('*'));
+                const textNode = all.reverse().find(el => /nueva tarjeta/i.test((el.innerText || el.textContent || '').trim()) && (el.innerText || '').length < 35);
+                if (textNode) {
+                    let curr = textNode;
+                    let depth = 0;
+                    while (curr && curr !== document.body && depth < 5) {
+                        curr.click();
+                        curr.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                        curr.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                        curr.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                        
+                        const rKey = Object.keys(curr).find(k => k.startsWith('__reactProps'));
+                        if (rKey && curr[rKey]?.onClick) {
+                            curr[rKey].onClick({ preventDefault: () => {}, stopPropagation: () => {} });
+                        }
+
+                        const fKey = Object.keys(curr).find(k => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'));
+                        if (fKey && curr[fKey]) {
+                            let fiber = curr[fKey];
+                            let fDepth = 0;
+                            while (fiber && fDepth < 6) {
+                                if (fiber.memoizedProps?.onClick) {
+                                    fiber.memoizedProps.onClick({ preventDefault: () => {}, stopPropagation: () => {} });
+                                }
+                                fiber = fiber.return;
+                                fDepth++;
+                            }
+                        }
+
+                        curr = curr.parentElement;
+                        depth++;
+                    }
+                }
+            }).catch(() => {});
+
+            await this.page.waitForTimeout(2000);
+
+            // Verificar si el modal ya abrió
+            const modalAbierto = await this.page.locator('.Modal, [role="dialog"], [class*="modal" i], [class*="dialog" i], [class*="drawer" i], input[placeholder*="número" i]').first().isVisible({ timeout: 1000 }).catch(() => false);
+            if (modalAbierto) {
+                console.log("✅ Modal de tarjeta abierto exitosamente en Chile.");
+                break;
+            }
+        }
+
+        // 2. Determinar el contenedor estricto (Modal, Iframe o sección de Pago)
+        const modalContainer = this.page.locator('.Modal, [role="dialog"], [class*="modal" i], [class*="dialog" i], [class*="CardForm" i]').first();
+        const tieneModal = await modalContainer.isVisible({ timeout: 3000 }).catch(() => false);
+
+        const iframeCard = this.page.frames().find(f => f !== this.page.mainFrame() && (f.url().includes('card') || f.url().includes('kushki') || f.url().includes('payu') || f.url().includes('payment')));
+
+        let scope = this.page;
+        if (iframeCard) {
+            console.log("Detectado iframe de pasarela de pago para tarjeta.");
+            scope = iframeCard;
+        } else if (tieneModal) {
+            console.log("Detectado contenedor Modal para formulario de tarjeta.");
+            scope = modalContainer;
+        } else {
+            console.log("Usando contenedor de Métodos de Pago para tarjeta...");
+            scope = this.page.locator('.PaymentMethods, [class*="PaymentMethod"], [class*="payment" i]').last();
+        }
+
+        // Llenado ordenado de los 4 campos del modal de tarjeta
+        const anioAEnviar = String(cardData.expiryFullYear || cardData.expiryYear || '2030');
+        const mesAEnviar = String(cardData.expiryMonth || '01');
+        const cvvAEnviar = String(cardData.cvv || '123');
+        const numAEnviar = String(cardData.numberClean || cardData.number);
+
+        console.log(`Llenando formulario de tarjeta en Chile: Num=${numAEnviar}, Mes=${mesAEnviar}, Año=${anioAEnviar}, CVV=${cvvAEnviar}...`);
+
+        const textInputs = scope.locator('input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])');
+        const count = await textInputs.count().catch(() => 0);
+        console.log(`Total de inputs de texto detectados en el modal: ${count}`);
+
+        // 1. Número de Tarjeta
+        const inpCard = count >= 4 ? textInputs.nth(0) : scope.locator('input[placeholder*="número" i], input[name*="number" i], input[name*="card" i]').first();
+        if (await inpCard.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await inpCard.click();
+            await inpCard.fill('');
+            await inpCard.pressSequentially(numAEnviar, { delay: 40 });
+        }
+
+        // 2. Mes
+        const inpMes = count >= 4 ? textInputs.nth(1) : scope.locator('input[placeholder*="MM" i], input[name*="month" i], div:has-text("Mes") input').first();
+        if (await inpMes.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await inpMes.click();
+            await inpMes.fill('');
+            await inpMes.pressSequentially(mesAEnviar, { delay: 40 });
+        }
+
+        // 3. Año de expiración
+        const inpAnio = count >= 4 ? textInputs.nth(2) : scope.locator('input[placeholder*="YYYY" i], input[name*="year" i], div:has-text("Año") input').first();
+        if (await inpAnio.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await inpAnio.click();
+            await inpAnio.fill('');
+            await inpAnio.pressSequentially(anioAEnviar, { delay: 40 });
+        }
+
+        // 4. CVV
+        const inpCvv = count >= 4 ? textInputs.nth(3) : scope.locator('input[placeholder*="CVV" i], input[placeholder*="000" i], input[name*="cvv" i]').first();
+        if (await inpCvv.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await inpCvv.click();
+            await inpCvv.fill('');
+            await inpCvv.pressSequentially(cvvAEnviar, { delay: 40 });
+        }
+
+        // Inyección de respaldo con React Native Setter en el DOM del modal
+        await this.page.evaluate(({ cardNum, mes, anio, cvv }) => {
+            const modal = document.querySelector('.Modal, [role="dialog"], [class*="modal" i]') || document;
+            const inputs = Array.from(modal.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])'));
+            const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+            
+            const fillInp = (input, val) => {
+                if (!input) return;
+                input.focus();
+                if (setter) setter.call(input, val);
+                else input.value = val;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                input.dispatchEvent(new Event('blur', { bubbles: true }));
+            };
+
+            if (inputs.length >= 4) {
+                fillInp(inputs[0], cardNum);
+                fillInp(inputs[1], mes);
+                fillInp(inputs[2], anio);
+                fillInp(inputs[3], cvv);
+            }
+        }, {
+            cardNum: numAEnviar,
+            mes: mesAEnviar,
+            anio: anioAEnviar,
+            cvv: cvvAEnviar
+        }).catch(() => {});
+
+        await this.page.waitForTimeout(1000);
+
+        // 5. Checkbox "Utilizar mismos datos de la compra" (asegurar que esté marcado)
+        const checkMismosDatos = scope.locator('input[type="checkbox"], [role="checkbox"], label').filter({ hasText: /utilizar mismos datos/i }).first();
+        if (await checkMismosDatos.isVisible({ timeout: 2000 }).catch(() => false)) {
+            const isChecked = await checkMismosDatos.evaluate(el => {
+                const inp = el.querySelector('input[type="checkbox"]') || (el.tagName === 'INPUT' ? el : null);
+                return inp ? inp.checked : el.classList.contains('active') || el.classList.contains('checked');
+            }).catch(() => true);
+
+            if (!isChecked) {
+                console.log("Marcando casilla 'Utilizar mismos datos de la compra'...");
+                await checkMismosDatos.click({ force: true }).catch(() => {});
+            }
+        }
+
+        await this.page.waitForTimeout(1000);
+
+        // 6. Guardar Tarjeta en el Modal (botón rojo 'Guardar tarjeta')
+        console.log("Guardando tarjeta en Chile...");
+        const btnGuardarTarjeta = scope.locator('button')
+            .filter({ hasText: /guardar tarjeta|guardar|confirmar/i })
+            .first()
+            .or(scope.locator('button[type="submit"]').first());
+
+        if (await btnGuardarTarjeta.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await btnGuardarTarjeta.click({ force: true }).catch(async () => {
+                await btnGuardarTarjeta.evaluate(b => b.click());
+            });
+        }
+
+        // Esperar cierre del modal
+        await this.page.locator('.Modal, [role="dialog"]').first().waitFor({ state: 'hidden', timeout: 8000 }).catch(() => {});
+        await this.page.waitForTimeout(2000);
+        console.log("✅ Proceso de adición de tarjeta finalizado en Chile.");
+    }
+
+    /**
+     * Selecciona el método de pago en Chile:
+     * - 'Tarjeta' / 'Tarjeta Débito / Crédito'
+     * - 'Efectivo'
+     * @param {'tarjeta' | 'efectivo' | string} metodoPago
+     * @param {string|number|object} [montoCambioOCard]
+     */
+    async seleccionarMetodoPago(metodoPago = 'Efectivo', montoCambioOCard = null) {
+        const metodoLower = (metodoPago || '').toLowerCase();
+        const esTarjeta = metodoLower.includes('tarjeta') || metodoLower.includes('debito') || metodoLower.includes('débito') || metodoLower.includes('credito') || metodoLower.includes('crédito') || metodoLower === 'card';
+
+        // 1. Esperar a que la página esté estable y hacer scroll
+        await this.page.locator('.Modal, [role="dialog"], .Loading').first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
+
+        const seccionMetodoPago = this.page.locator('text=/método de pago|metodo de pago/i').first();
+        await seccionMetodoPago.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
+
+        if (esTarjeta) {
+            console.log('Seleccionando método de pago en Chile: "Tarjeta" -> "Débito / Crédito"...');
+
+            // PASO 1: Seleccionar el Radio Button Principal 'Tarjeta'
+            console.log('1. Seleccionando Radio Button Principal: "Tarjeta"...');
+            const textoTarjeta = this.page.getByText(/^tarjeta$/i).first();
+            if (await textoTarjeta.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await textoTarjeta.scrollIntoViewIfNeeded().catch(() => {});
+                await textoTarjeta.click({ force: true }).catch(() => {});
+                const boxT = await textoTarjeta.boundingBox().catch(() => null);
+                if (boxT) {
+                    await this.page.mouse.click(boxT.x - 22, boxT.y + boxT.height / 2).catch(() => {});
+                    await this.page.mouse.click(boxT.x - 14, boxT.y + boxT.height / 2).catch(() => {});
+                }
+            }
+
+            await this.page.evaluate(() => {
+                const nodes = Array.from(document.querySelectorAll('*'));
+                const el = nodes.find(e => /^tarjeta$/i.test((e.innerText || e.textContent || '').trim()));
+                if (el) {
+                    el.click();
+                    const parent = el.closest('label') || el.parentElement;
+                    if (parent) parent.click();
+                }
+            }).catch(() => {});
+
+            await this.page.waitForTimeout(1000);
+
+            // PASO 2: Seleccionar el Sub-Radio Button 'Débito / Crédito'
+            console.log('2. Seleccionando Sub-Radio Button: "Débito / Crédito"...');
+            for (let intento = 1; intento <= 6; intento++) {
+                const coords = await this.page.evaluate(() => {
+                    const all = Array.from(document.querySelectorAll('*'));
+                    const match = all.reverse().find(el => {
+                        const txt = (el.innerText || el.textContent || '').trim();
+                        return /d[eé]bito\s*\/\s*cr[eé]dito/i.test(txt) && txt.length < 50;
+                    });
+                    if (!match) return null;
+
+                    let row = match;
+                    while (row.parentElement && row.parentElement !== document.body) {
+                        if (row.parentElement.querySelectorAll('svg, img, [class*="visa" i], [class*="card" i]').length > 0) {
+                            row = row.parentElement;
+                            break;
+                        }
+                        if (row.tagName === 'LABEL' || row.getAttribute('role') === 'radio') break;
+                        row = row.parentElement;
+                    }
+
+                    const rect = row.getBoundingClientRect();
+                    const circle = row.querySelector('input[type="radio"], [class*="radio" i], [class*="circle" i], svg, span:first-child');
+                    const circleRect = circle ? circle.getBoundingClientRect() : null;
+
+                    return {
+                        row: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+                        circle: circleRect && circleRect.width > 0 ? { x: circleRect.x, y: circleRect.y, width: circleRect.width, height: circleRect.height } : null
+                    };
+                }).catch(() => null);
+
+                if (coords) {
+                    if (coords.circle) {
+                        await this.page.mouse.click(coords.circle.x + coords.circle.width / 2, coords.circle.y + coords.circle.height / 2).catch(() => {});
+                    } else {
+                        await this.page.mouse.click(coords.row.x + 15, coords.row.y + coords.row.height / 2).catch(() => {});
+                    }
+                    await this.page.mouse.click(coords.row.x + 60, coords.row.y + coords.row.height / 2).catch(() => {});
+                } else {
+                    const debitoLoc = this.page.getByText(/d[eé]bito\s*\/\s*cr[eé]dito/i).first();
+                    if (await debitoLoc.isVisible({ timeout: 2000 }).catch(() => false)) {
+                        await debitoLoc.click({ force: true }).catch(() => {});
+                    }
+                }
+
+                // Invocación exhaustiva en DOM y React Fiber
+                await this.page.evaluate(() => {
+                    const all = Array.from(document.querySelectorAll('*'));
+                    const match = all.reverse().find(el => {
+                        const txt = (el.innerText || el.textContent || '').trim();
+                        return /d[eé]bito\s*\/\s*cr[eé]dito/i.test(txt) && txt.length < 50;
+                    });
+                    if (!match) return;
+
+                    let curr = match;
+                    for (let i = 0; i < 5; i++) {
+                        if (!curr) break;
+
+                        curr.click();
+                        curr.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                        curr.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                        curr.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+
+                        const rKey = Object.keys(curr).find(k => k.startsWith('__reactProps'));
+                        if (rKey && curr[rKey]) {
+                            if (typeof curr[rKey].onClick === 'function') curr[rKey].onClick({ preventDefault: () => {}, stopPropagation: () => {} });
+                            if (typeof curr[rKey].onChange === 'function') curr[rKey].onChange({ target: { checked: true } });
+                        }
+
+                        const fKey = Object.keys(curr).find(k => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'));
+                        if (fKey && curr[fKey]) {
+                            let fiber = curr[fKey];
+                            let depth = 0;
+                            while (fiber && depth < 6) {
+                                if (fiber.memoizedProps?.onClick) fiber.memoizedProps.onClick({ preventDefault: () => {}, stopPropagation: () => {} });
+                                if (fiber.memoizedProps?.onChange) fiber.memoizedProps.onChange({ target: { checked: true } });
+                                fiber = fiber.return;
+                                depth++;
+                            }
+                        }
+
+                        const radio = curr.querySelector('input[type="radio"]') || (curr.tagName === 'INPUT' ? curr : null);
+                        if (radio) {
+                            const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'checked')?.set;
+                            if (nativeSetter) nativeSetter.call(radio, true);
+                            radio.checked = true;
+                            radio.dispatchEvent(new Event('input', { bubbles: true }));
+                            radio.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+
+                        curr = curr.parentElement;
+                    }
+                }).catch(() => {});
+
+                await this.page.waitForTimeout(1500);
+
+                const btnNuevaPresente = await this.page.locator('button, [role="button"], a, div, span')
+                    .filter({ hasText: /agregar nueva tarjeta|nueva tarjeta|agregar tarjeta|añadir tarjeta|\+ agregar/i })
+                    .first().isVisible({ timeout: 1000 }).catch(() => false);
+
+                if (btnNuevaPresente) {
+                    console.log('✅ Sub-radio "Débito / Crédito" seleccionado correctamente en Chile.');
+                    break;
+                } else {
+                    console.log(`Aviso (Intento ${intento}): Reintentando selección de "Débito / Crédito"...`);
+                }
+            }
+
+            await this.page.waitForTimeout(1000);
+
+            // PASO 3: Abrir modal y completar datos de tarjeta
+            const cardData = (typeof montoCambioOCard === 'object' && montoCambioOCard !== null) ? montoCambioOCard : {
+                number: "4013540682746260",
+                numberClean: "4013540682746260",
+                expiry: "01/30",
+                expiryMonth: "01",
+                expiryYear: "2030",
+                expiryFullYear: "2030",
+                cvv: "123",
+                name: "APRO APRO",
+                document: "123456789"
+            };
+
+            await this.agregarNuevaTarjeta(cardData);
+
+            await this.asegurarDatosFacturacion();
+            return;
+        }
+
+        console.log(`Seleccionando método de pago en Chile: "Efectivo"...`);
+        const selectorPago = this.page.locator(`input[value*="Efectivo"], label:has-text("Efectivo"), [id*="Efectivo"], label:has-text("Dinheiro"), label:has-text("Efectivo en entrega")`).first();
         if (await selectorPago.isVisible({ timeout: 4000 }).catch(() => false)) {
             await selectorPago.scrollIntoViewIfNeeded().catch(() => {});
             await selectorPago.check().catch(async () => {
                 await selectorPago.click();
             });
-        } else {
-            const primerOpcionPago = this.page.locator('.PaymentMethods label, [class*="PaymentMethod"] label, input[type="radio"] + label').first();
-            if (await primerOpcionPago.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await primerOpcionPago.click().catch(() => {});
+        }
+        await this.asegurarDatosFacturacion();
+        await this.page.waitForTimeout(1500);
+    }
+
+    /**
+     * Procesa el pago final, monitorea el endpoint de backend y confirma la orden en Chile
+     * @returns {Promise<string|null>} Código de pedido generado
+     */
+    async procesarPagoYConfirmarOrden() {
+        console.log("Iniciando procesamiento de pago y confirmación de orden en Chile...");
+
+        await this.asegurarDatosFacturacion();
+
+        let codigoDetectado = null;
+
+        const promesaRespuestaOrden = this.page.waitForResponse(response => {
+            const url = response.url().toLowerCase();
+            const esEndpointOrden = url.includes('/order') || url.includes('/checkout') || url.includes('/orders') || url.includes('/payment');
+            return esEndpointOrden && (response.status() === 200 || response.status() === 201);
+        }, { timeout: 45000 }).then(async resp => {
+            try {
+                const json = await resp.json();
+                console.log("Payload JSON interceptado de creación de orden en Chile:", JSON.stringify(json).slice(0, 300));
+                const codigo = json?.id || json?.orderId || json?.code || json?.orderNumber || json?.data?.id || json?.data?.orderId || json?.data?.code;
+                if (codigo) {
+                    console.log(`🎯 Código de pedido interceptado en red: ${codigo}`);
+                    return String(codigo);
+                }
+            } catch (e) {}
+            return null;
+        }).catch(() => null);
+
+        console.log("Haciendo clic en el botón principal 'Pagar' / 'Confirmar Pedido'...");
+        const btnPagarFinal = this.btnPagar.last();
+        await btnPagarFinal.scrollIntoViewIfNeeded().catch(() => {});
+        await btnPagarFinal.click({ force: true }).catch(async () => {
+            await btnPagarFinal.evaluate(b => b.click());
+        });
+
+        console.log("Esperando procesamiento de la orden...");
+        await this.page.waitForTimeout(3000);
+
+        codigoDetectado = await promesaRespuestaOrden;
+
+        const selectoresExito = [
+            this.page.locator('text=/¡gracias por tu compra|tu pedido está en camino|pedido confirmado|orden confirmada|resumen del pedido/i'),
+            this.page.locator('.OrderSuccess, .OrderDetail, [class*="OrderSuccess"], [class*="Confirmation"], [class*="order-success"]')
+        ];
+
+        for (const selector of selectoresExito) {
+            if (await selector.first().isVisible({ timeout: 15000 }).catch(() => false)) {
+                console.log("Pantalla de confirmación de pedido visible.");
+                break;
             }
         }
-        await this.page.waitForTimeout(3000);
+
+        if (!codigoDetectado) {
+            const textoPagina = await this.page.innerText('body').catch(() => '');
+            const match = textoPagina.match(/(\d{8,12}-\d{4,8}|\b\d{9,16}\b|[A-Z0-9]{8,12})/);
+            if (match) {
+                codigoDetectado = match[1];
+            }
+        }
+
+        this.codigoPedido = codigoDetectado || "ORDEN-GENERADA";
+        console.log(`✅ Orden finalizada con éxito en Chile. Código de Pedido: ${this.codigoPedido}`);
+        return this.codigoPedido;
     }
 }

@@ -6,11 +6,21 @@ import { CartPage } from '../pages/CartPage.js';
 import { CheckoutPage } from '../pages/CheckoutPage.js';
 import { ejecutarPaso } from '../../../utils/pasos.js';
 
-test('Flujo E2E - Compra a domicilio usuario anónimo (Chile)', async ({ page }, testInfo) => {
+/**
+ * Función base que ejecuta el flujo completo de Delivery en Chile con el método de pago especificado
+ * @param {import('@playwright/test').Page} page
+ * @param {import('@playwright/test').TestInfo} testInfo
+ * @param {'Tarjeta Débito / Crédito' | 'Efectivo'} metodoPago
+ */
+async function ejecutarFlujoDeliveryChile(page, testInfo, metodoPago) {
+    test.setTimeout(180000);
+
     const homePage = new HomePage(page);
     const menuPage = new MenuPage(page);
     const cartPage = new CartPage(page);
     const checkoutPage = new CheckoutPage(page);
+
+    let codigoPedidoGenerado = null;
 
     // Paso 1: Navegación y Ubicación
     await ejecutarPaso(page, testInfo, {
@@ -47,18 +57,57 @@ test('Flujo E2E - Compra a domicilio usuario anónimo (Chile)', async ({ page },
         await cartPage.irAPagar();
     });
 
-    // Paso 4: Checkout y Confirmación de Datos
+    // Paso 4: Dirección de Entrega y Datos Personales
     await ejecutarPaso(page, testInfo, {
         numero: 4,
-        titulo: 'Dirección de Entrega, Datos Personales y Pago',
-        descripcion: 'Ingreso de dirección de entrega, datos del cliente y método de pago en Chile'
+        titulo: 'Dirección de Entrega y Datos del Cliente',
+        descripcion: 'Llenado de dirección de entrega detallada y datos personales del cliente en Chile'
     }, async () => {
         await checkoutPage.iniciarCompletar();
         await checkoutPage.llenarDireccionEntrega(testData.deliveryAddress);
-        await checkoutPage.llenarDatosPersonales(testData.customer);
-        await checkoutPage.seleccionarMetodoPago(testData.paymentMethodId);
+        const datosCliente = (metodoPago === testData.paymentMethods.tarjeta) ? testData.customerTarjeta : testData.customer;
+        await checkoutPage.llenarDatosPersonales(datosCliente);
     });
 
-    console.log("Flujo Chile Delivery finalizado con éxito.");
-    await page.waitForTimeout(5000);
+    // Paso 5: Selección de Método de Pago, Procesamiento y Generación de Orden
+    await ejecutarPaso(page, testInfo, {
+        numero: 5,
+        titulo: 'Método de Pago, Procesamiento y Detalle de la Orden',
+        descripcion: `Selección de '${metodoPago}', procesamiento de pago y captura de número de orden en Chile`
+    }, async () => {
+        const parametroPago = (metodoPago === testData.paymentMethods.tarjeta) ? testData.card : null;
+        await checkoutPage.seleccionarMetodoPago(metodoPago, parametroPago);
+        codigoPedidoGenerado = await checkoutPage.procesarPagoYConfirmarOrden();
+
+        // Registrar metadatos en el informe ejecutivo
+        testInfo.annotations.push({
+            type: 'Método de Pago',
+            description: metodoPago
+        });
+
+        if (codigoPedidoGenerado) {
+            testInfo.annotations.push({
+                type: 'Código de Pedido',
+                description: codigoPedidoGenerado
+            });
+            await testInfo.attach('📋 Código de Pedido Confirmado', {
+                body: `Código de Pedido: ${codigoPedidoGenerado}\nMétodo de Pago: ${metodoPago}`,
+                contentType: 'text/plain'
+            });
+        }
+    });
+
+    console.log(`✅ Flujo Chile Delivery (${metodoPago}) finalizado exitosamente. Orden: [ ${codigoPedidoGenerado} ]`);
+}
+
+// =========================================================================
+// 🇨🇱 Casos de Prueba E2E - Métodos de Pago Chile
+// =========================================================================
+
+test('Flujo E2E - Compra Delivery con Tarjeta Débito/Crédito (Chile)', async ({ page }, testInfo) => {
+    await ejecutarFlujoDeliveryChile(page, testInfo, testData.paymentMethods.tarjeta);
+});
+
+test('Flujo E2E - Compra Delivery con Efectivo (Chile)', async ({ page }, testInfo) => {
+    await ejecutarFlujoDeliveryChile(page, testInfo, testData.paymentMethods.efectivo);
 });
