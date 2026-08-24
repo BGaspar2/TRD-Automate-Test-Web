@@ -232,51 +232,77 @@ export class CheckoutPage {
         await seccionMetodoPago.scrollIntoViewIfNeeded({ timeout: 4000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        if (esPuntoVenta) {
-            console.log('Seleccionando método de pago: "Punto De Venta"...');
-            const radioPunto = this.page.locator('label, [role="radio"], div, span')
-                .filter({ hasText: /^Punto De Venta$/i })
-                .or(this.page.getByRole('radio', { name: /punto de venta/i }))
-                .or(this.page.locator('label:has-text("Punto De Venta"), label:has-text("Punto de venta")'));
+        const nombreBuscar = esPuntoVenta ? 'Punto de Venta' : 'Efectivo';
+        console.log(`Seleccionando método de pago en Ecuador: "${nombreBuscar}"...`);
 
-            const opcion = radioPunto.first();
-            await opcion.waitFor({ state: 'visible', timeout: 8000 });
-            await opcion.scrollIntoViewIfNeeded().catch(() => {});
-            await opcion.click({ force: true }).catch(async () => {
-                await opcion.evaluate(el => el.click());
-            });
+        const regexNombre = esPuntoVenta ? /punto de venta/i : /^efectivo$/i;
 
-            // Fallback directo por evento
-            await this.page.evaluate(() => {
-                const labels = Array.from(document.querySelectorAll('label, div, span'));
-                const match = labels.find(l => /punto de venta/i.test((l.innerText || '').trim()));
-                if (match) match.click();
-            }).catch(() => {});
+        for (let intento = 1; intento <= 5; intento++) {
+            // Estrategia 1: getByRole('radio')
+            const radioRole = this.page.getByRole('radio', { name: regexNombre });
+            if (await radioRole.first().isVisible({ timeout: 1000 }).catch(() => false)) {
+                await radioRole.first().check({ force: true }).catch(async () => {
+                    await radioRole.first().click({ force: true });
+                });
+            }
 
-            console.log('✅ Opción "Punto De Venta" seleccionada.');
-        } else {
-            console.log('Seleccionando método de pago: "Efectivo"...');
-            const radioEfectivo = this.page.locator('label, [role="radio"], div, span')
-                .filter({ hasText: /^Efectivo$/i })
-                .or(this.page.getByRole('radio', { name: /^efectivo$/i }))
-                .or(this.page.locator('label:has-text("Efectivo")'));
+            // Estrategia 2: getByLabel
+            const labelRole = this.page.getByLabel(regexNombre);
+            if (await labelRole.first().isVisible({ timeout: 1000 }).catch(() => false)) {
+                await labelRole.first().check({ force: true }).catch(async () => {
+                    await labelRole.first().click({ force: true });
+                });
+            }
 
-            const opcion = radioEfectivo.first();
-            await opcion.waitFor({ state: 'visible', timeout: 8000 });
-            await opcion.scrollIntoViewIfNeeded().catch(() => {});
-            await opcion.click({ force: true }).catch(async () => {
-                await opcion.evaluate(el => el.click());
-            });
+            // Estrategia 3: label locator con text
+            const labelDirect = this.page.locator('label').filter({ hasText: regexNombre }).first();
+            if (await labelDirect.isVisible({ timeout: 1000 }).catch(() => false)) {
+                await labelDirect.scrollIntoViewIfNeeded().catch(() => {});
+                await labelDirect.click({ force: true }).catch(() => {});
+            }
 
-            await this.page.evaluate(() => {
-                const labels = Array.from(document.querySelectorAll('label, div, span'));
-                const match = labels.find(l => /^efectivo$/i.test((l.innerText || '').trim()));
-                if (match) match.click();
-            }).catch(() => {});
+            // Estrategia 4: getByText directo
+            const textDirect = this.page.getByText(regexNombre).first();
+            if (await textDirect.isVisible({ timeout: 1000 }).catch(() => false)) {
+                await textDirect.click({ force: true }).catch(() => {});
+            }
 
-            console.log('✅ Opción "Efectivo" seleccionada.');
+            // Estrategia 5: Disparo nativo y emulación en DOM
+            await this.page.evaluate((esPuntoVentaFlag) => {
+                const targetRegex = esPuntoVentaFlag ? /punto de venta/i : /^efectivo$/i;
+                const allNodes = Array.from(document.querySelectorAll('label, div, span, p, input[type="radio"]'));
+                for (const el of allNodes) {
+                    const txt = (el.innerText || el.textContent || el.value || '').trim();
+                    if (targetRegex.test(txt)) {
+                        el.click();
+                        const label = el.closest('label') || el.parentElement;
+                        if (label) label.click();
+                        const input = label?.querySelector('input[type="radio"]') || el.parentElement?.querySelector('input[type="radio"]');
+                        if (input) {
+                            input.checked = true;
+                            input.click();
+                            input.dispatchEvent(new Event('input', { bubbles: true }));
+                            input.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                        break;
+                    }
+                }
+            }, esPuntoVenta).catch(() => {});
+
             await this.page.waitForTimeout(1500);
 
+            // Verificar si 'Débito / Crédito' y advertencias de tarjeta desaparecieron
+            const advertenciaTarjeta = this.page.locator('text=/no olvides ingresar tu tarjeta|débito \\/ crédito/i');
+            const sigueTarjeta = await advertenciaTarjeta.first().isVisible({ timeout: 1000 }).catch(() => false);
+            if (!sigueTarjeta) {
+                console.log(`✅ Confirmado: "${nombreBuscar}" seleccionado correctamente.`);
+                break;
+            } else {
+                console.log(`Intento ${intento}: Reintentando selección de "${nombreBuscar}"...`);
+            }
+        }
+
+        if (!esPuntoVenta) {
             // Localizador del Switch de 'Pagar con valor total / Monto exacto'
             const switchValorTotal = this.page.locator('input[type="checkbox"], [role="switch"], .Switch, [class*="switch"], [class*="Toggle"], [class*="checkbox"]')
                 .or(this.page.locator('label, div').filter({ hasText: /valor total|monto exacto|total exacto|pago total|monto a pagar/i }).locator('input, [role="switch"]'))

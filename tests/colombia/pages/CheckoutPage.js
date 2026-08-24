@@ -235,50 +235,72 @@ export class CheckoutPage {
         const nombreBuscar = esDatafono ? 'Datáfono' : 'Efectivo';
         console.log(`Seleccionando método de pago en Colombia: "${nombreBuscar}"...`);
 
-        // 2. Localizar y hacer clic en el radio/texto específico
-        const radioTexto = this.page.getByText(new RegExp(`^${nombreBuscar}$`, 'i'))
-            .or(this.page.getByRole('radio', { name: new RegExp(nombreBuscar, 'i') }))
-            .or(this.page.getByLabel(new RegExp(nombreBuscar, 'i')));
+        const regexNombre = esDatafono ? /dat[aá]fono/i : /^efectivo$/i;
 
-        const opcion = radioTexto.first();
-        await opcion.waitFor({ state: 'visible', timeout: 8000 });
-        await opcion.scrollIntoViewIfNeeded().catch(() => {});
-        await opcion.click({ force: true });
-
-        // 3. Forzar activación en DOM del input radio correspondiente
-        await this.page.evaluate((nombre) => {
-            const clean = nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            const allElements = Array.from(document.querySelectorAll('label, div, span'));
-            for (const el of allElements) {
-                const txt = (el.innerText || '').trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                if (txt === clean) {
-                    const input = el.querySelector('input[type="radio"]') || 
-                                  (el.getAttribute('for') ? document.getElementById(el.getAttribute('for')) : null) ||
-                                  el.closest('label')?.querySelector('input[type="radio"]') ||
-                                  el.parentElement?.querySelector('input[type="radio"]');
-                    if (input) {
-                        input.checked = true;
-                        input.click();
-                        input.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                    el.click();
-                    break;
-                }
+        for (let intento = 1; intento <= 5; intento++) {
+            // Estrategia 1: getByRole('radio')
+            const radioRole = this.page.getByRole('radio', { name: regexNombre });
+            if (await radioRole.first().isVisible({ timeout: 1000 }).catch(() => false)) {
+                await radioRole.first().check({ force: true }).catch(async () => {
+                    await radioRole.first().click({ force: true });
+                });
             }
-        }, nombreBuscar).catch(() => {});
 
-        await this.page.waitForTimeout(1500);
+            // Estrategia 2: getByLabel
+            const labelRole = this.page.getByLabel(regexNombre);
+            if (await labelRole.first().isVisible({ timeout: 1000 }).catch(() => false)) {
+                await labelRole.first().check({ force: true }).catch(async () => {
+                    await labelRole.first().click({ force: true });
+                });
+            }
 
-        // 4. VALIDACIÓN: Asegurar que "Tarjeta" no siga seleccionada
-        const advertenciaTarjeta = this.page.locator('text=/no olvides ingresar tu tarjeta/i');
-        if (await advertenciaTarjeta.isVisible({ timeout: 1500 }).catch(() => false)) {
-            console.log(`Aviso: "Tarjeta" sigue activa, reintentando clic en el radio circular de "${nombreBuscar}"...`);
-            const fallbackRadio = this.page.locator('label').filter({ hasText: new RegExp(nombreBuscar, 'i') }).first();
-            await fallbackRadio.click({ force: true }).catch(() => {});
+            // Estrategia 3: label locator con text
+            const labelDirect = this.page.locator('label').filter({ hasText: regexNombre }).first();
+            if (await labelDirect.isVisible({ timeout: 1000 }).catch(() => false)) {
+                await labelDirect.scrollIntoViewIfNeeded().catch(() => {});
+                await labelDirect.click({ force: true }).catch(() => {});
+            }
+
+            // Estrategia 4: getByText directo
+            const textDirect = this.page.getByText(regexNombre).first();
+            if (await textDirect.isVisible({ timeout: 1000 }).catch(() => false)) {
+                await textDirect.click({ force: true }).catch(() => {});
+            }
+
+            // Estrategia 5: Disparo nativo y emulación en DOM
+            await this.page.evaluate((esDatafonoFlag) => {
+                const targetRegex = esDatafonoFlag ? /dat[aá]fono/i : /^efectivo$/i;
+                const allNodes = Array.from(document.querySelectorAll('label, div, span, p, input[type="radio"]'));
+                for (const el of allNodes) {
+                    const txt = (el.innerText || el.textContent || el.value || '').trim();
+                    if (targetRegex.test(txt)) {
+                        el.click();
+                        const label = el.closest('label') || el.parentElement;
+                        if (label) label.click();
+                        const input = label?.querySelector('input[type="radio"]') || el.parentElement?.querySelector('input[type="radio"]');
+                        if (input) {
+                            input.checked = true;
+                            input.click();
+                            input.dispatchEvent(new Event('input', { bubbles: true }));
+                            input.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                        break;
+                    }
+                }
+            }, esDatafono).catch(() => {});
+
             await this.page.waitForTimeout(1500);
-        }
 
-        console.log(`✅ Opción "${nombreBuscar}" seleccionada.`);
+            // Verificar si 'Débito / Crédito' y 'No olvides ingresar tu tarjeta' desaparecieron
+            const advertenciaTarjeta = this.page.locator('text=/no olvides ingresar tu tarjeta|débito \\/ crédito/i');
+            const sigueTarjeta = await advertenciaTarjeta.first().isVisible({ timeout: 1000 }).catch(() => false);
+            if (!sigueTarjeta) {
+                console.log(`✅ Confirmado: "${nombreBuscar}" seleccionado correctamente.`);
+                break;
+            } else {
+                console.log(`Intento ${intento}: Reintentando selección de "${nombreBuscar}"...`);
+            }
+        }
 
         if (!esDatafono) {
             // Localizador del Switch de 'Pagar con valor total / Monto exacto'
