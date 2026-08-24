@@ -200,7 +200,10 @@ export class CheckoutPage {
         await btnGuardar.click({ force: true }).catch(async () => {
             await btnGuardar.evaluate(b => b.click()).catch(() => {});
         });
-        await this.page.waitForTimeout(4000);
+        
+        // Esperar cierre del modal y estabilización
+        await this.page.locator('.AddressForm, .Modal, [role="dialog"]').first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(3000);
     }
 
     async llenarDatosPersonales(cliente) {
@@ -210,7 +213,7 @@ export class CheckoutPage {
         await this.llenarCampoSeguro(this.inputEmail, cliente.email);
         await this.llenarCampoSeguro(this.inputPhoneCustomer, cliente.phone);
         await this.llenarCampoSeguro(this.inputDocument, cliente.document);
-        await this.page.waitForTimeout(3000);
+        await this.page.waitForTimeout(2000);
     }
 
     /**
@@ -227,9 +230,12 @@ export class CheckoutPage {
         const esEfectivoCambio = metodoLower.includes('cambio') || metodoLower === 'efectivo_cambio';
         const esEfectivoExacto = !esDatafono && !esEfectivoCambio;
 
-        // 1. Scroll a la sección de Método de Pago
+        // 1. Esperar a que la página esté estable y hacer scroll
+        await this.page.locator('.Modal, [role="dialog"], .Loading').first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
+
         const seccionMetodoPago = this.page.locator('text=/método de pago|metodo de pago/i').first();
-        await seccionMetodoPago.scrollIntoViewIfNeeded({ timeout: 4000 }).catch(() => {});
+        await seccionMetodoPago.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
         const nombreBuscar = esDatafono ? 'Datáfono' : 'Efectivo';
@@ -237,37 +243,22 @@ export class CheckoutPage {
 
         const regexNombre = esDatafono ? /dat[aá]fono/i : /^efectivo$/i;
 
-        for (let intento = 1; intento <= 5; intento++) {
-            // Estrategia 1: getByRole('radio')
-            const radioRole = this.page.getByRole('radio', { name: regexNombre });
-            if (await radioRole.first().isVisible({ timeout: 1000 }).catch(() => false)) {
-                await radioRole.first().check({ force: true }).catch(async () => {
-                    await radioRole.first().click({ force: true });
-                });
-            }
-
-            // Estrategia 2: getByLabel
-            const labelRole = this.page.getByLabel(regexNombre);
-            if (await labelRole.first().isVisible({ timeout: 1000 }).catch(() => false)) {
-                await labelRole.first().check({ force: true }).catch(async () => {
-                    await labelRole.first().click({ force: true });
-                });
-            }
-
-            // Estrategia 3: label locator con text
+        for (let intento = 1; intento <= 6; intento++) {
+            // Clic en el label que contiene el texto
             const labelDirect = this.page.locator('label').filter({ hasText: regexNombre }).first();
-            if (await labelDirect.isVisible({ timeout: 1000 }).catch(() => false)) {
+            if (await labelDirect.isVisible().catch(() => false)) {
                 await labelDirect.scrollIntoViewIfNeeded().catch(() => {});
-                await labelDirect.click({ force: true }).catch(() => {});
+                await labelDirect.click().catch(async () => {
+                    await labelDirect.click({ force: true });
+                });
+            } else {
+                const textDirect = this.page.getByText(regexNombre).first();
+                if (await textDirect.isVisible().catch(() => false)) {
+                    await textDirect.click({ force: true }).catch(() => {});
+                }
             }
 
-            // Estrategia 4: getByText directo
-            const textDirect = this.page.getByText(regexNombre).first();
-            if (await textDirect.isVisible({ timeout: 1000 }).catch(() => false)) {
-                await textDirect.click({ force: true }).catch(() => {});
-            }
-
-            // Estrategia 5: Disparo nativo y emulación en DOM
+            // Refuerzo en DOM
             await this.page.evaluate((esDatafonoFlag) => {
                 const targetRegex = esDatafonoFlag ? /dat[aá]fono/i : /^efectivo$/i;
                 const allNodes = Array.from(document.querySelectorAll('label, div, span, p, input[type="radio"]'));
@@ -298,7 +289,7 @@ export class CheckoutPage {
                 console.log(`✅ Confirmado: "${nombreBuscar}" seleccionado correctamente.`);
                 break;
             } else {
-                console.log(`Intento ${intento}: Reintentando selección de "${nombreBuscar}"...`);
+                console.log(`Aviso (Intento ${intento}): Tarjeta sigue activa. Reintentando selección de "${nombreBuscar}"...`);
             }
         }
 
