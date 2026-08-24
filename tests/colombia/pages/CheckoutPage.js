@@ -280,49 +280,75 @@ export class CheckoutPage {
     async agregarNuevaTarjeta(cardData) {
         console.log("Iniciando proceso para agregar nueva tarjeta...");
 
-        // 1. Localizar y hacer clic en el botón '➕ Nueva tarjeta'
-        const btnNuevaTarjeta = this.page.locator('button, [role="button"], a, div')
-            .filter({ hasText: /nueva tarjeta/i })
-            .first();
+        // 1. Localizar y hacer clic en el botón negro '➕ Nueva tarjeta'
+        for (let intento = 1; intento <= 4; intento++) {
+            const btnNuevaTarjeta = this.page.locator('button, [role="button"], div, span, a')
+                .filter({ hasText: /nueva tarjeta/i })
+                .last();
 
-        if (await btnNuevaTarjeta.isVisible({ timeout: 5000 }).catch(() => false)) {
-            console.log("Haciendo clic en el botón '➕ Nueva tarjeta'...");
-            await btnNuevaTarjeta.scrollIntoViewIfNeeded().catch(() => {});
-            
-            const box = await btnNuevaTarjeta.boundingBox().catch(() => null);
-            if (box) {
-                await this.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2).catch(() => {});
+            if (await btnNuevaTarjeta.isVisible({ timeout: 3000 }).catch(() => false)) {
+                console.log(`Intento ${intento}: Haciendo clic en el botón '➕ Nueva tarjeta'...`);
+                await btnNuevaTarjeta.scrollIntoViewIfNeeded().catch(() => {});
+                
+                const box = await btnNuevaTarjeta.boundingBox().catch(() => null);
+                if (box) {
+                    await this.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2).catch(() => {});
+                }
+                
+                await btnNuevaTarjeta.click({ force: true }).catch(() => {});
             }
-            
-            await btnNuevaTarjeta.click({ force: true }).catch(async () => {
-                await btnNuevaTarjeta.evaluate(b => b.click());
-            });
+
+            // Disparo en React Props y DOM
+            await this.page.evaluate(() => {
+                const all = Array.from(document.querySelectorAll('*'));
+                const target = all.reverse().find(el => /nueva tarjeta/i.test((el.innerText || el.textContent || '').trim()) && (el.innerText || '').length < 30);
+                if (target) {
+                    let p = target;
+                    for (let i = 0; i < 4; i++) {
+                        if (!p) break;
+                        p.click();
+                        p.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                        const rKey = Object.keys(p).find(k => k.startsWith('__reactProps'));
+                        if (rKey && p[rKey]?.onClick) p[rKey].onClick({ preventDefault: () => {}, stopPropagation: () => {} });
+                        p = p.parentElement;
+                    }
+                }
+            }).catch(() => {});
+
+            await this.page.waitForTimeout(1500);
+
+            // Verificar si el modal ya abrió
+            const modalAbierto = await this.page.locator('.Modal, [role="dialog"], [class*="modal" i], [class*="dialog" i], [class*="drawer" i]').first().isVisible({ timeout: 1000 }).catch(() => false);
+            if (modalAbierto) {
+                console.log("✅ Modal de tarjeta abierto exitosamente.");
+                break;
+            }
         }
 
-        // Disparo complementario en DOM
-        await this.page.evaluate(() => {
-            const all = Array.from(document.querySelectorAll('button, [role="button"], div, span, a'));
-            const btn = all.find(el => /nueva tarjeta/i.test((el.innerText || el.textContent || '').trim()));
-            if (btn) {
-                btn.click();
-                const parentBtn = btn.closest('button') || btn.closest('[role="button"]') || btn.parentElement;
-                if (parentBtn) parentBtn.click();
-            }
-        }).catch(() => {});
+        // 2. Determinar el contenedor estricto (Modal, Iframe o sección de Pago - NUNCA el formulario de cliente)
+        const modalContainer = this.page.locator('.Modal, [role="dialog"], [class*="modal" i], [class*="dialog" i], [class*="CardForm" i]').first();
+        const tieneModal = await modalContainer.isVisible({ timeout: 3000 }).catch(() => false);
 
-        // Esperar a que el modal o los campos de tarjeta aparezcan
-        await this.page.waitForTimeout(2000);
-        await this.page.locator('.Modal, [role="dialog"], [class*="modal" i], input[placeholder*="número" i], input[name*="number" i]').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+        // Buscar iframe si aplica
+        const iframeCard = this.page.frames().find(f => f !== this.page.mainFrame() && (f.url().includes('card') || f.url().includes('kushki') || f.url().includes('payu') || f.url().includes('payment')));
 
-        // 2. Verificar si el formulario está en el documento principal o dentro de un iframe
-        const frameOrPage = this.page;
+        let scope = this.page;
+        if (iframeCard) {
+            console.log("Detectado iframe de pasarela de pago para tarjeta.");
+            scope = iframeCard;
+        } else if (tieneModal) {
+            console.log("Detectado contenedor Modal para formulario de tarjeta.");
+            scope = modalContainer;
+        } else {
+            console.log("Usando contenedor de Métodos de Pago para tarjeta...");
+            scope = this.page.locator('.PaymentMethods, [class*="PaymentMethod"], [class*="payment" i]').last();
+        }
 
-        console.log(`Ingresando número de tarjeta: ${cardData.number}...`);
-        // Número de Tarjeta
-        const inputNumero = frameOrPage.locator('input[name*="number" i], input[name*="card" i], input[placeholder*="número" i], input[placeholder*="numero" i], input[id*="card" i], input[autocomplete*="cc-number" i]').first()
-            .or(frameOrPage.locator('.CardNumber input, [class*="card"] input').first());
+        console.log(`Ingresando número de tarjeta en el modal: ${cardData.number}...`);
+        // Número de Tarjeta (dentro del scope estricto)
+        const inputNumero = scope.locator('input[name*="number" i], input[name*="card" i], input[placeholder*="número" i], input[placeholder*="numero" i], input[id*="card" i], input[autocomplete*="cc-number" i], input[type="tel"]').first();
 
-        if (await inputNumero.isVisible({ timeout: 6000 }).catch(() => false)) {
+        if (await inputNumero.isVisible({ timeout: 5000 }).catch(() => false)) {
             await inputNumero.click();
             await inputNumero.fill(cardData.numberClean || cardData.number);
             await inputNumero.evaluate((el, v) => {
@@ -332,10 +358,10 @@ export class CheckoutPage {
             }, cardData.numberClean || cardData.number).catch(() => {});
         }
 
-        // Nombre del Titular
+        // Nombre del Titular (dentro del scope estricto)
         console.log(`Ingresando titular: "${cardData.name}"...`);
-        const inputTitular = frameOrPage.locator('input[name*="name" i], input[name*="holder" i], input[placeholder*="titular" i], input[placeholder*="nombre" i], input[id*="holder" i], input[autocomplete*="cc-name" i]').first();
-        if (await inputTitular.isVisible({ timeout: 3000 }).catch(() => false)) {
+        const inputTitular = scope.locator('input[name*="holder" i], input[name*="name" i], input[placeholder*="titular" i], input[placeholder*="nombre" i], input[id*="holder" i], input[autocomplete*="cc-name" i]').first();
+        if (await inputTitular.isVisible({ timeout: 2000 }).catch(() => false)) {
             await inputTitular.click();
             await inputTitular.fill(cardData.name);
             await inputTitular.evaluate((el, v) => {
@@ -345,9 +371,9 @@ export class CheckoutPage {
             }, cardData.name).catch(() => {});
         }
 
-        // Fecha de Expiración (Mes / Año o MM/AA)
+        // Fecha de Expiración (Mes / Año o MM/AA dentro del scope estricto)
         console.log(`Ingresando fecha de expiración: "${cardData.expiry}"...`);
-        const inputExpiry = frameOrPage.locator('input[name*="exp" i], input[placeholder*="MM/AA" i], input[placeholder*="MM/YY" i], input[placeholder*="vencimiento" i], input[id*="exp" i]').first();
+        const inputExpiry = scope.locator('input[name*="exp" i], input[placeholder*="MM/AA" i], input[placeholder*="MM/YY" i], input[placeholder*="vencimiento" i], input[id*="exp" i]').first();
         if (await inputExpiry.isVisible({ timeout: 2000 }).catch(() => false)) {
             await inputExpiry.click();
             await inputExpiry.fill(cardData.expiry || '01/30');
@@ -357,9 +383,8 @@ export class CheckoutPage {
                 el.dispatchEvent(new Event('change', { bubbles: true }));
             }, cardData.expiry || '01/30').catch(() => {});
         } else {
-            // Inputs separados de Mes y Año
-            const inputMes = frameOrPage.locator('input[name*="month" i], select[name*="month" i], input[placeholder*="MM" i]').first();
-            const inputAnio = frameOrPage.locator('input[name*="year" i], select[name*="year" i], input[placeholder*="AA" i], input[placeholder*="YY" i]').first();
+            const inputMes = scope.locator('input[name*="month" i], select[name*="month" i], input[placeholder*="MM" i]').first();
+            const inputAnio = scope.locator('input[name*="year" i], select[name*="year" i], input[placeholder*="AA" i], input[placeholder*="YY" i]').first();
             if (await inputMes.isVisible({ timeout: 1500 }).catch(() => false)) {
                 await inputMes.fill(cardData.expiryMonth || '01');
             }
@@ -368,10 +393,10 @@ export class CheckoutPage {
             }
         }
 
-        // Código de Seguridad CVV
+        // Código de Seguridad CVV (dentro del scope estricto)
         console.log(`Ingresando código de seguridad CVV: "${cardData.cvv}"...`);
-        const inputCvv = frameOrPage.locator('input[name*="cvv" i], input[name*="cvc" i], input[name*="code" i], input[placeholder*="CVV" i], input[placeholder*="CVC" i], input[placeholder*="seguridad" i], input[id*="cvv" i]').first();
-        if (await inputCvv.isVisible({ timeout: 3000 }).catch(() => false)) {
+        const inputCvv = scope.locator('input[name*="cvv" i], input[name*="cvc" i], input[name*="code" i], input[placeholder*="CVV" i], input[placeholder*="CVC" i], input[placeholder*="seguridad" i], input[id*="cvv" i]').first();
+        if (await inputCvv.isVisible({ timeout: 2000 }).catch(() => false)) {
             await inputCvv.click();
             await inputCvv.fill(cardData.cvv);
             await inputCvv.evaluate((el, v) => {
@@ -381,9 +406,9 @@ export class CheckoutPage {
             }, cardData.cvv).catch(() => {});
         }
 
-        // Documento de Identidad (si aplica en el modal de tarjeta)
-        if (cardData.document) {
-            const inputDoc = frameOrPage.locator('input[name*="doc" i], input[name*="identification" i], input[placeholder*="documento" i], input[placeholder*="cédula" i], input[placeholder*="cedula" i], input[id*="doc" i]').first();
+        // Documento de Identidad (solo si está dentro del modal)
+        if (cardData.document && (tieneModal || iframeCard)) {
+            const inputDoc = scope.locator('input[name*="doc" i], input[name*="identification" i], input[placeholder*="documento" i], input[placeholder*="cédula" i], input[placeholder*="cedula" i], input[id*="doc" i]').first();
             if (await inputDoc.isVisible({ timeout: 1500 }).catch(() => false)) {
                 console.log(`Ingresando documento en modal de tarjeta: "${cardData.document}"...`);
                 await inputDoc.click();
@@ -393,9 +418,9 @@ export class CheckoutPage {
 
         await this.page.waitForTimeout(1000);
 
-        // 3. Guardar / Confirmar Tarjeta
+        // 3. Guardar / Confirmar Tarjeta en el Modal
         console.log("Guardando tarjeta...");
-        const btnGuardarTarjeta = frameOrPage.locator('button[type="submit"], button')
+        const btnGuardarTarjeta = scope.locator('button[type="submit"], button')
             .filter({ hasText: /guardar|agregar|confirmar|añadir|continuar|salvar/i })
             .last();
 
