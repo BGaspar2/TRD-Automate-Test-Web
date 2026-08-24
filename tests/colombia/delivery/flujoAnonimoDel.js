@@ -65,7 +65,8 @@ async function ejecutarFlujoDeliveryColombia(page, testInfo, metodoPago) {
     }, async () => {
         await checkoutPage.iniciarCompletar();
         await checkoutPage.llenarDireccionEntrega(testData.deliveryAddress);
-        await checkoutPage.llenarDatosPersonales(testData.customer);
+        const datosCliente = (metodoPago === testData.paymentMethods.tarjeta) ? testData.customerTarjeta : testData.customer;
+        await checkoutPage.llenarDatosPersonales(datosCliente);
     });
 
     // Paso 5: Selección de Método de Pago, Procesamiento y Generación de Orden

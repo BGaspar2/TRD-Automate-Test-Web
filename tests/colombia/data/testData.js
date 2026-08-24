@@ -22,6 +22,13 @@ export const testData = {
         phone: "3001234567",
         document: "1012345678"
     },
+    customerTarjeta: {
+        name: "APRO",
+        lastName: "APRO",
+        email: "juan.perez@example.com",
+        phone: "3001234567",
+        document: "123456789"
+    },
     paymentMethods: {
         tarjeta: "Tarjeta Débito / Crédito",
         datafono: "Datáfono",
