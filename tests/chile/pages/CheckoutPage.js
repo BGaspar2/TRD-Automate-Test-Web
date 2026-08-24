@@ -476,24 +476,68 @@ export class CheckoutPage {
      */
     async llenarCvvExternoSiAplica(cvv = '123') {
         const cvvValor = String(cvv || '123');
-        console.log(`Verificando campo de CVV externo en checkout principal: "${cvvValor}"...`);
-        const inputCvvAfuera = this.page.locator('input[placeholder*="012" i], input[placeholder*="CVV" i], input[placeholder*="000" i], input[name*="cvv" i], input[name*="cvc" i], input[id*="cvv" i]')
-            .or(this.page.locator('div:has-text("CVV") input, label:has-text("CVV") input, div:has-text("Ingresa el CVV") input, label:has-text("Ingresa el CVV") input').first())
-            .first();
+        console.log(`Buscando campo de CVV externo en checkout principal: "${cvvValor}"...`);
 
-        if (await inputCvvAfuera.isVisible({ timeout: 3500 }).catch(() => false)) {
-            console.log(`Llenando CVV externo en el checkout principal: "${cvvValor}"...`);
-            await inputCvvAfuera.scrollIntoViewIfNeeded().catch(() => {});
-            await inputCvvAfuera.click();
-            await inputCvvAfuera.fill('');
-            await inputCvvAfuera.pressSequentially(cvvValor, { delay: 50 });
-            await inputCvvAfuera.evaluate((inp, v) => {
-                inp.value = v;
-                inp.dispatchEvent(new Event('input', { bubbles: true }));
-                inp.dispatchEvent(new Event('change', { bubbles: true }));
-                inp.dispatchEvent(new Event('blur', { bubbles: true }));
-            }, cvvValor).catch(() => {});
-            console.log("✅ CVV externo completado con éxito.");
+        for (let intento = 1; intento <= 5; intento++) {
+            await this.page.waitForTimeout(1000);
+
+            // 1. Inyección y detección por DOM en tiempo real
+            const resDom = await this.page.evaluate((val) => {
+                const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])'));
+                for (const inp of allInputs) {
+                    const parentText = (inp.closest('div, label, section, form')?.innerText || '').toLowerCase();
+                    const placeholder = (inp.placeholder || '').toLowerCase();
+                    const name = (inp.name || '').toLowerCase();
+                    const id = (inp.id || '').toLowerCase();
+                    
+                    if (parentText.includes('cvv') || placeholder.includes('012') || placeholder.includes('cvv') || placeholder.includes('000') || name.includes('cvv') || id.includes('cvv') || parentText.includes('seguridad')) {
+                        inp.focus();
+                        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+                        if (setter) setter.call(inp, val);
+                        else inp.value = val;
+                        inp.dispatchEvent(new Event('input', { bubbles: true }));
+                        inp.dispatchEvent(new Event('change', { bubbles: true }));
+                        inp.dispatchEvent(new Event('blur', { bubbles: true }));
+                        
+                        const rect = inp.getBoundingClientRect();
+                        return { found: true, rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } };
+                    }
+                }
+                return { found: false };
+            }, cvvValor).catch(() => ({ found: false }));
+
+            if (resDom?.found && resDom.rect && resDom.rect.width > 0) {
+                console.log(`Campo de CVV externo detectado en coordenadas (${resDom.rect.x}, ${resDom.rect.y}). Digitando...`);
+                await this.page.mouse.click(resDom.rect.x + resDom.rect.w / 2, resDom.rect.y + resDom.rect.h / 2).catch(() => {});
+                await this.page.keyboard.press('Control+A').catch(() => {});
+                await this.page.keyboard.press('Backspace').catch(() => {});
+                await this.page.keyboard.type(cvvValor, { delay: 50 }).catch(() => {});
+                console.log("✅ CVV externo completado con éxito.");
+                break;
+            }
+
+            // 2. Localizadores directos de Playwright
+            const inputCvvAfuera = this.page.locator('input[placeholder*="012" i], input[placeholder*="CVV" i], input[placeholder*="000" i], input[name*="cvv" i], input[name*="cvc" i], input[id*="cvv" i]')
+                .or(this.page.locator('div:has-text("CVV") input, label:has-text("CVV") input, div:has-text("Ingresa el CVV") input, label:has-text("Ingresa el CVV") input').first())
+                .first();
+
+            if (await inputCvvAfuera.isVisible({ timeout: 1000 }).catch(() => false)) {
+                console.log(`Llenando CVV externo vía selector Playwright: "${cvvValor}"...`);
+                await inputCvvAfuera.scrollIntoViewIfNeeded().catch(() => {});
+                await inputCvvAfuera.click();
+                await inputCvvAfuera.fill('');
+                await inputCvvAfuera.pressSequentially(cvvValor, { delay: 50 });
+                await inputCvvAfuera.evaluate((inp, v) => {
+                    inp.value = v;
+                    inp.dispatchEvent(new Event('input', { bubbles: true }));
+                    inp.dispatchEvent(new Event('change', { bubbles: true }));
+                    inp.dispatchEvent(new Event('blur', { bubbles: true }));
+                }, cvvValor).catch(() => {});
+                console.log("✅ CVV externo completado con éxito.");
+                break;
+            }
+
+            console.log(`Intento ${intento}: Esperando renderizado del input CVV externo...`);
         }
     }
 
