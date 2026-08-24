@@ -39,6 +39,7 @@
     "test:brasil:pickup": "playwright test brasil/pickup/flujoAnonimoPickup.js --headed",
     "test:brasil:registro": "playwright test brasil/auth/flujoRegistroOtp.js --headed",
     "test:argentina:pickup": "playwright test argentina/pickup/flujoAnonimoPickup.js --headed",
+    "test:argentina:pickup:tarjeta": "playwright test argentina/pickup/flujoAnonimoPickup.js -g \"Tarjeta\" --headed",
     "test:argentina:registro": "playwright test argentina/auth/flujoRegistroOtp.js --headed",
     "report:ejecutivo": "node utils/abrirReporte.js",
     "report:tecnico": "playwright show-report playwright-report/tecnico"

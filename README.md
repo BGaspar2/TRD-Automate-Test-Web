@@ -165,7 +165,8 @@ npm run test:chile
 npm run test:chile:pickup
 npm run test:chile:registro
 
-# Argentina
+# Argentina (Pickup con Tarjeta y Efectivo, Registro):
+npm run test:argentina:pickup:tarjeta
 npm run test:argentina:pickup
 npm run test:argentina:registro
 
