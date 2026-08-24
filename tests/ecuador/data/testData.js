@@ -22,5 +22,9 @@ export const testData = {
         phone: "0981234567",
         document: "1712345678"
     },
-    paymentMethodId: "#Efectivo"
+    paymentMethodId: "#Efectivo",
+    registration: {
+        baseEmail: process.env.TEST_EMAIL || "[EMAIL_ADDRESS]",
+        timeoutOtpMs: 55000
+    }
 };
