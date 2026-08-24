@@ -417,25 +417,93 @@ export class CheckoutPage {
         await this.page.waitForTimeout(1000);
 
         if (esTarjeta) {
-            console.log('Seleccionando método de pago en Colombia: "Tarjeta Débito / Crédito"...');
+            console.log('Seleccionando método de pago en Colombia: "Tarjeta" -> "Débito / Crédito"...');
 
-            // 1. Clic en la opción principal 'Tarjeta'
-            const radioTarjeta = this.page.locator('label, [class*="Radio"], [class*="radio"]').filter({ hasText: /^tarjeta$/i }).first()
-                .or(this.page.getByText(/^tarjeta$/i).first());
-            if (await radioTarjeta.isVisible({ timeout: 3000 }).catch(() => false)) {
-                await radioTarjeta.click({ force: true }).catch(() => {});
+            // PASO 1: Seleccionar el Radio Button Principal 'Tarjeta'
+            console.log('1. Seleccionando Radio Button Principal: "Tarjeta"...');
+            const textoTarjeta = this.page.getByText(/^tarjeta$/i).first();
+            if (await textoTarjeta.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await textoTarjeta.scrollIntoViewIfNeeded().catch(() => {});
+                await textoTarjeta.click({ force: true }).catch(() => {});
+                const boxT = await textoTarjeta.boundingBox().catch(() => null);
+                if (boxT) {
+                    await this.page.mouse.click(boxT.x - 22, boxT.y + boxT.height / 2).catch(() => {});
+                    await this.page.mouse.click(boxT.x - 14, boxT.y + boxT.height / 2).catch(() => {});
+                }
             }
 
-            // 2. Clic en el sub-radio 'Débito / Crédito'
-            const subRadioDebito = this.page.locator('label, [class*="Radio"], [class*="radio"]').filter({ hasText: /débito \/ crédito|debito \/ credito/i }).first()
-                .or(this.page.getByText(/débito \/ crédito|debito \/ credito/i).first());
-            if (await subRadioDebito.isVisible({ timeout: 3000 }).catch(() => false)) {
-                await subRadioDebito.click({ force: true }).catch(() => {});
+            await this.page.evaluate(() => {
+                const nodes = Array.from(document.querySelectorAll('*'));
+                const el = nodes.find(e => /^tarjeta$/i.test((e.innerText || e.textContent || '').trim()));
+                if (el) {
+                    el.click();
+                    const parent = el.closest('label') || el.parentElement;
+                    if (parent) parent.click();
+                }
+            }).catch(() => {});
+
+            await this.page.waitForTimeout(1000);
+
+            // PASO 2: Seleccionar el Sub-Radio Button 'Débito / Crédito'
+            console.log('2. Seleccionando Sub-Radio Button: "Débito / Crédito"...');
+            for (let intento = 1; intento <= 5; intento++) {
+                const textoDebito = this.page.getByText(/d[eé]bito\s*\/\s*cr[eé]dito/i).first()
+                    .or(this.page.locator('label, [class*="Radio"], [class*="radio"]').filter({ hasText: /d[eé]bito\s*\/\s*cr[eé]dito/i }).first());
+
+                if (await textoDebito.isVisible({ timeout: 3000 }).catch(() => false)) {
+                    await textoDebito.scrollIntoViewIfNeeded().catch(() => {});
+                    await textoDebito.click({ force: true }).catch(() => {});
+
+                    const boxD = await textoDebito.boundingBox().catch(() => null);
+                    if (boxD) {
+                        // Clic físico en el círculo del sub-radio (a la izquierda del texto)
+                        await this.page.mouse.click(boxD.x - 22, boxD.y + boxD.height / 2).catch(() => {});
+                        await this.page.mouse.click(boxD.x - 14, boxD.y + boxD.height / 2).catch(() => {});
+                        await this.page.mouse.click(boxD.x + 10, boxD.y + boxD.height / 2).catch(() => {});
+                    }
+                }
+
+                // Disparo en DOM directo sobre el sub-radio Débito / Crédito
+                await this.page.evaluate(() => {
+                    const allNodes = Array.from(document.querySelectorAll('label, div, span, p, input[type="radio"]'));
+                    for (const el of allNodes) {
+                        const txt = (el.innerText || el.textContent || el.value || '').trim();
+                        if (/d[eé]bito\s*\/\s*cr[eé]dito/i.test(txt)) {
+                            el.click();
+                            const label = el.closest('label') || el.parentElement;
+                            if (label) label.click();
+                            const input = label?.querySelector('input[type="radio"]') || el.parentElement?.querySelector('input[type="radio"]');
+                            if (input) {
+                                const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'checked')?.set;
+                                if (nativeSetter) nativeSetter.call(input, true);
+                                input.checked = true;
+                                input.click();
+                                input.dispatchEvent(new Event('input', { bubbles: true }));
+                                input.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                            break;
+                        }
+                    }
+                }).catch(() => {});
+
+                await this.page.waitForTimeout(1200);
+
+                // Verificar si apareció el botón de agregar tarjeta o el formulario
+                const btnNuevaPresente = await this.page.locator('button, [role="button"], a, div')
+                    .filter({ hasText: /agregar nueva tarjeta|nueva tarjeta|agregar tarjeta|añadir tarjeta|\+ agregar/i })
+                    .first().isVisible({ timeout: 1000 }).catch(() => false);
+
+                if (btnNuevaPresente) {
+                    console.log('✅ Sub-radio "Débito / Crédito" seleccionado correctamente (botón nueva tarjeta visible).');
+                    break;
+                } else {
+                    console.log(`Aviso (Intento ${intento}): Reintentando clic en "Débito / Crédito"...`);
+                }
             }
 
-            await this.page.waitForTimeout(1500);
+            await this.page.waitForTimeout(1000);
 
-            // 3. Si se pasaron datos de tarjeta o si el botón de agregar tarjeta está presente
+            // PASO 3: Abrir modal y completar datos de tarjeta
             const cardData = (typeof montoCambioOCard === 'object' && montoCambioOCard !== null) ? montoCambioOCard : {
                 number: "4111 1111 1111 1111",
                 numberClean: "4111111111111111",
