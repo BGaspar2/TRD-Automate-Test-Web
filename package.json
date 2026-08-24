@@ -13,6 +13,7 @@
     "test:regional:registro": "playwright test flujoRegistroOtp.js --headed --workers=1",
     "test:regional:registro:headless": "playwright test flujoRegistroOtp.js --workers=1",
     "test:ecuador": "playwright test ecuador/delivery/flujoAnonimoDel.js --headed --workers=1",
+    "test:ecuador:tarjeta": "playwright test ecuador/delivery/flujoAnonimoDel.js -g \"Tarjeta\" --headed",
     "test:ecuador:pos": "playwright test ecuador/delivery/flujoAnonimoDel.js -g \"Punto de Venta\" --headed",
     "test:ecuador:efectivo:exacto": "playwright test ecuador/delivery/flujoAnonimoDel.js -g \"Monto Exacto\" --headed",
     "test:ecuador:efectivo:cambio": "playwright test ecuador/delivery/flujoAnonimoDel.js -g \"Con Cambio\" --headed",

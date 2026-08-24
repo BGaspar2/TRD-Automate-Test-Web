@@ -103,10 +103,11 @@ TRD-Automate-Test-Web/
 ### 1. 🇨🇴 Colombia (Delivery & Pickup)
 
 ```bash
-# Suite completa de Delivery (Datáfono, Efectivo Exacto, Efectivo Cambio):
+# Suite completa de Delivery (Tarjeta, Datáfono, Efectivo Exacto, Efectivo Cambio):
 npm run test:colombia
 
 # Pruebas individuales por método de pago:
+npm run test:colombia:tarjeta
 npm run test:colombia:datafono
 npm run test:colombia:efectivo:exacto
 npm run test:colombia:efectivo:cambio
@@ -121,10 +122,11 @@ npm run test:colombia:registro
 ### 2. 🇪🇨 Ecuador (Delivery & Pickup)
 
 ```bash
-# Suite completa de Delivery (Punto de Venta, Efectivo Exacto, Efectivo Cambio):
+# Suite completa de Delivery (Tarjeta, Punto de Venta, Efectivo Exacto, Efectivo Cambio):
 npm run test:ecuador
 
 # Pruebas individuales por método de pago:
+npm run test:ecuador:tarjeta
 npm run test:ecuador:pos
 npm run test:ecuador:efectivo:exacto
 npm run test:ecuador:efectivo:cambio

@@ -65,7 +65,8 @@ async function ejecutarFlujoDeliveryEcuador(page, testInfo, metodoPago) {
     }, async () => {
         await checkoutPage.iniciarCompletar();
         await checkoutPage.llenarDireccionEntrega(testData.deliveryAddress);
-        await checkoutPage.llenarDatosPersonales(testData.customer);
+        const datosCliente = (metodoPago === testData.paymentMethods.tarjeta) ? testData.customerTarjeta : testData.customer;
+        await checkoutPage.llenarDatosPersonales(datosCliente);
     });
 
     // Paso 5: Selección de Método de Pago, Procesamiento y Generación de Orden
@@ -74,7 +75,8 @@ async function ejecutarFlujoDeliveryEcuador(page, testInfo, metodoPago) {
         titulo: 'Método de Pago, Procesamiento y Detalle de la Orden',
         descripcion: `Selección de '${metodoPago}', procesamiento de pago y captura de número de orden`
     }, async () => {
-        await checkoutPage.seleccionarMetodoPago(metodoPago, testData.montoCambio);
+        const parametroPago = (metodoPago === testData.paymentMethods.tarjeta) ? testData.card : testData.montoCambio;
+        await checkoutPage.seleccionarMetodoPago(metodoPago, parametroPago);
         codigoPedidoGenerado = await checkoutPage.procesarPagoYConfirmarOrden();
 
         // Registrar metadatos en el informe ejecutivo
@@ -101,6 +103,10 @@ async function ejecutarFlujoDeliveryEcuador(page, testInfo, metodoPago) {
 // =========================================================================
 // 🇪🇨 Casos de Prueba E2E - Métodos de Pago Ecuador
 // =========================================================================
+
+test('Flujo E2E - Compra Delivery con Tarjeta Débito/Crédito (Ecuador)', async ({ page }, testInfo) => {
+    await ejecutarFlujoDeliveryEcuador(page, testInfo, testData.paymentMethods.tarjeta);
+});
 
 test('Flujo E2E - Compra Delivery con Punto de Venta (Ecuador)', async ({ page }, testInfo) => {
     await ejecutarFlujoDeliveryEcuador(page, testInfo, testData.paymentMethods.puntoDeVenta);
