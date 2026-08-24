@@ -6,11 +6,21 @@ import { CartPage } from '../pages/CartPage.js';
 import { CheckoutPage } from '../pages/CheckoutPage.js';
 import { ejecutarPaso } from '../../../utils/pasos.js';
 
-test('Flujo E2E - Compra a domicilio usuario anónimo (Colombia)', async ({ page }, testInfo) => {
+/**
+ * Función base que ejecuta el flujo completo de Delivery en Colombia con el método de pago especificado
+ * @param {import('@playwright/test').Page} page
+ * @param {import('@playwright/test').TestInfo} testInfo
+ * @param {'Datáfono' | 'Efectivo (Monto Exacto)' | 'Efectivo (Con Cambio)'} metodoPago
+ */
+async function ejecutarFlujoDeliveryColombia(page, testInfo, metodoPago) {
+    test.setTimeout(180000);
+
     const homePage = new HomePage(page);
     const menuPage = new MenuPage(page);
     const cartPage = new CartPage(page);
     const checkoutPage = new CheckoutPage(page);
+
+    let codigoPedidoGenerado = null;
 
     // Paso 1: Navegación y Ubicación
     await ejecutarPaso(page, testInfo, {
@@ -40,25 +50,66 @@ test('Flujo E2E - Compra a domicilio usuario anónimo (Colombia)', async ({ page
     await ejecutarPaso(page, testInfo, {
         numero: 3,
         titulo: 'Revisión y Validación del Carrito de Compras',
-        descripcion: 'Verificación de montos mínimos/máximos y avance al pago'
+        descripcion: 'Verificación de montos mínimos/máximos y avance al checkout'
     }, async () => {
         await cartPage.procesarModalCarrito();
         await cartPage.validarYAjustarMontoCarrito();
         await cartPage.irAPagar();
     });
 
-    // Paso 4: Checkout y Confirmación de Datos
+    // Paso 4: Dirección de Entrega y Datos Personales
     await ejecutarPaso(page, testInfo, {
         numero: 4,
-        titulo: 'Dirección de Entrega, Datos Personales y Pago',
-        descripcion: 'Ingreso de dirección de entrega, datos del cliente y método de pago'
+        titulo: 'Dirección de Entrega y Datos del Cliente',
+        descripcion: 'Llenado de dirección de entrega detallada y datos personales del cliente'
     }, async () => {
         await checkoutPage.iniciarCompletar();
         await checkoutPage.llenarDireccionEntrega(testData.deliveryAddress);
         await checkoutPage.llenarDatosPersonales(testData.customer);
-        await checkoutPage.seleccionarMetodoPago(testData.paymentMethodId);
     });
 
-    console.log("Flujo Colombia Delivery finalizado con éxito.");
-    await page.waitForTimeout(5000);
+    // Paso 5: Selección de Método de Pago, Procesamiento y Generación de Orden
+    await ejecutarPaso(page, testInfo, {
+        numero: 5,
+        titulo: 'Método de Pago, Procesamiento y Detalle de la Orden',
+        descripcion: `Selección de '${metodoPago}', procesamiento de pago y captura de número de orden`
+    }, async () => {
+        await checkoutPage.seleccionarMetodoPago(metodoPago, testData.montoCambio);
+        codigoPedidoGenerado = await checkoutPage.procesarPagoYConfirmarOrden();
+
+        // Registrar metadatos en el informe ejecutivo
+        testInfo.annotations.push({
+            type: 'Método de Pago',
+            description: metodoPago
+        });
+
+        if (codigoPedidoGenerado) {
+            testInfo.annotations.push({
+                type: 'Código de Pedido',
+                description: codigoPedidoGenerado
+            });
+            await testInfo.attach('📋 Código de Pedido Confirmado', {
+                body: `Código de Pedido: ${codigoPedidoGenerado}\nMétodo de Pago: ${metodoPago}`,
+                contentType: 'text/plain'
+            });
+        }
+    });
+
+    console.log(`✅ Flujo Colombia Delivery (${metodoPago}) finalizado exitosamente. Orden: [ ${codigoPedidoGenerado} ]`);
+}
+
+// =========================================================================
+// 🇨🇴 Casos de Prueba E2E - Métodos de Pago Colombia
+// =========================================================================
+
+test('Flujo E2E - Compra Delivery con Datáfono (Colombia)', async ({ page }, testInfo) => {
+    await ejecutarFlujoDeliveryColombia(page, testInfo, testData.paymentMethods.datafono);
+});
+
+test('Flujo E2E - Compra Delivery con Efectivo (Monto Exacto) (Colombia)', async ({ page }, testInfo) => {
+    await ejecutarFlujoDeliveryColombia(page, testInfo, testData.paymentMethods.efectivoExacto);
+});
+
+test('Flujo E2E - Compra Delivery con Efectivo (Con Cambio) (Colombia)', async ({ page }, testInfo) => {
+    await ejecutarFlujoDeliveryColombia(page, testInfo, testData.paymentMethods.efectivoCambio);
 });

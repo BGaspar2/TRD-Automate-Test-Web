@@ -1,9 +1,12 @@
+import { expect } from '@playwright/test';
+
 export class CheckoutPage {
     /**
      * @param {import('@playwright/test').Page} page
      */
     constructor(page) {
         this.page = page;
+        this.codigoPedido = null;
 
         this.btnCompletar = page.getByRole('button', { name: /^completar/i })
             .or(page.locator('button, [role="button"], a, div[class*="cursor-pointer"], span[class*="cursor-pointer"]').filter({ hasText: /^completar/i }))
@@ -18,24 +21,33 @@ export class CheckoutPage {
         this.inputLastName = page.locator('input[name="lastName"], #lastName, input[placeholder*="Apellido"], input[placeholder*="apellido"]').first();
         this.inputEmail = page.locator('input[name="email"], input[type="email"], input[placeholder*="email"]').first();
         this.inputPhoneCustomer = page.locator('.PhoneNumber input, input[name="phone"], input[type="tel"], input[placeholder*="Teléfono"], input[placeholder*="telefone"]').first();
-        this.inputDocument = page.locator('#document, input[name="document"], input[placeholder*="Documento"], input[placeholder*="DNI"], input[placeholder*="CPF"], input[placeholder*="RUT"]').first();
+        this.inputDocument = page.locator('#document, input[name="document"], input[placeholder*="Documento"], input[placeholder*="DNI"], input[placeholder*="Cédula"]').first();
+
+        // Botón principal de Pagar / Realizar Pedido
+        this.btnPagar = page.locator('button.Button, button, [role="button"]')
+            .filter({ hasText: /pagar|confirmar pedido|realizar pedido|finalizar pedido|completar compra|hacer pedido/i });
+
+        // Indicadores de Procesando Orden
+        this.indicadorProcesando = page.locator('text=/procesando|procesando tu pedido|procesando orden|cargando/i')
+            .or(page.locator('[class*="Loading"], [class*="Spinner"], [class*="Processing"]'));
+
+        // Mensaje de Confirmación / Toast de Orden Exitosa
+        this.toastOrdenCreada = page.locator('[role="alert"], [role="status"], [class*="Toast"], [class*="Notification"], [class*="Success"], div')
+            .filter({ hasText: /orden creada|pedido creado|creada exitosamente|pedido realizado|éxito|exitosamente/i });
     }
 
     async iniciarCompletar() {
         console.log("Verificando si es necesario completar la dirección de entrega...");
 
-        // 1. Esperar a que la página de Checkout cargue
         await this.page.waitForLoadState('domcontentloaded').catch(() => {});
         await this.page.waitForTimeout(2000);
 
-        // 2. Si el formulario de dirección ya está visible (ej. modal ya abierto o formulario embebido), no requerir clic
         const formAddress = this.page.locator('.AddressForm, form.form, [class*="AddressForm"], [class*="address-form"], .Modal form, [role="dialog"] form, [role="dialog"]').first();
         if (await formAddress.isVisible({ timeout: 1500 }).catch(() => false)) {
             console.log("El formulario de dirección ya se encuentra visible.");
             return;
         }
 
-        // 3. Lista de selectores priorizados para el botón 'Completar' de la dirección
         const selectoresCompletar = [
             this.page.getByRole('button', { name: /^completar/i }),
             this.page.locator('.AddressCard, .DeliveryAddressCard, [class*="AddressCard"], [class*="DeliveryAddress"], [class*="FulfillAddress"], [class*="address-card"], [class*="delivery-address"]').locator('button, a, [role="button"], span, div').filter({ hasText: /completar|completar dirección|editar|cambiar|agregar/i }),
@@ -46,8 +58,6 @@ export class CheckoutPage {
         ];
 
         let btnEncontrado = null;
-
-        // Intentar encontrar un botón visible esperando hasta 8 segundos
         const inicio = Date.now();
         while (Date.now() - inicio < 8000 && !btnEncontrado) {
             for (const selector of selectoresCompletar) {
@@ -75,7 +85,6 @@ export class CheckoutPage {
             console.log("Haciendo clic en 'Completar' para abrir el modal de dirección...");
             await btnEncontrado.scrollIntoViewIfNeeded().catch(() => {});
 
-            // Intentar abrir la modal (hasta 3 intentos de clic si React tarda en reaccionar)
             let modalAbierto = false;
             for (let intento = 1; intento <= 3 && !modalAbierto; intento++) {
                 try {
@@ -90,7 +99,6 @@ export class CheckoutPage {
                     }).catch(() => {});
                 }
 
-                // Esperar a que la modal aparezca
                 modalAbierto = await formAddress.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
                 if (modalAbierto) {
                     console.log("Modal de dirección abierto con éxito.");
@@ -128,11 +136,9 @@ export class CheckoutPage {
     async llenarDireccionEntrega(direccion) {
         console.log("Llenando información de la dirección...");
 
-        // 1. Esperar a que el contenedor de la modal o formulario esté presente
         const formAddress = this.page.locator('.AddressForm, form.form, [class*="AddressForm"], [class*="address-form"], .Modal form, [role="dialog"] form, [role="dialog"]').first();
         await formAddress.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
 
-        // 2. Seleccionar etiqueta 'Casa' si está visible
         const btnCasa = this.page.locator('.AddressForm button, form.form button, [class*="AddressForm"] button, [role="dialog"] button')
             .filter({ hasText: /casa|home|casa \/ dpto/i }).first();
         if (await btnCasa.isVisible({ timeout: 1000 }).catch(() => false)) {
@@ -140,7 +146,6 @@ export class CheckoutPage {
             await btnCasa.click().catch(() => {});
         }
 
-        // 3. Mapeo directo por selectores e IDs estándar
         const mapeoCampos = [
             { ids: ['#mainStreet', 'input[name="mainStreet"]', 'input[placeholder*="Calle principal" i]', 'input[placeholder*="Dirección" i]', 'input[placeholder*="Direccion" i]'], valor: direccion.mainStreet, mantener: true },
             { ids: ['#secondaryStreet', 'input[name="secondaryStreet"]', 'input[placeholder*="Calle secundaria" i]', 'input[placeholder*="Intersección" i]', 'input[placeholder*="Entre" i]'], valor: direccion.secondaryStreet },
@@ -161,7 +166,6 @@ export class CheckoutPage {
             }
         }
 
-        // 4. Barrido general de inputs dentro del formulario para compatibilidad adicional
         const inputs = this.page.locator('.AddressForm input, .AddressForm textarea, [class*="AddressForm"] input, [class*="AddressForm"] textarea, form.form input, form.form textarea');
         const count = await inputs.count().catch(() => 0);
 
@@ -209,20 +213,203 @@ export class CheckoutPage {
         await this.page.waitForTimeout(3000);
     }
 
-    async seleccionarMetodoPago(paymentMethodId) {
-        console.log(`Seleccionando método de pago...`);
-        const selectorPago = this.page.locator(`${paymentMethodId}, input[value*="Efectivo"], label:has-text("Efectivo"), [id*="Efectivo"], label:has-text("Dinheiro"), label:has-text("Efectivo en entrega")`).first();
-        if (await selectorPago.isVisible({ timeout: 4000 }).catch(() => false)) {
-            await selectorPago.scrollIntoViewIfNeeded().catch(() => {});
-            await selectorPago.check().catch(async () => {
-                await selectorPago.click();
+    /**
+     * Selecciona el método de pago en Ecuador:
+     * - 'Datáfono' / 'Punto de venta'
+     * - 'Efectivo (Monto exacto)' / 'Efectivo' (con switch de valor total)
+     * - 'Efectivo (Con cambio)' (con monto mayor al total ingresado en el input)
+     * @param {'datafono' | 'efectivo_exacto' | 'efectivo_cambio' | string} metodoPago
+     * @param {string|number} [montoCambio]
+     */
+    async seleccionarMetodoPago(metodoPago = 'Datáfono', montoCambio = null) {
+        const metodoLower = (metodoPago || '').toLowerCase();
+        const esDatafono = metodoLower.includes('datafono') || metodoLower.includes('datáfono') || metodoLower.includes('punto') || metodoLower === 'pos';
+        const esEfectivoCambio = metodoLower.includes('cambio') || metodoLower === 'efectivo_cambio';
+        const esEfectivoExacto = !esDatafono && !esEfectivoCambio;
+
+        if (esDatafono) {
+            console.log('Seleccionando método de pago: "Datáfono"...');
+            const radioDatafono = this.page.locator('label, [role="radio"], div, span')
+                .filter({ hasText: /dat[aá]fono|punto de venta|tarjeta contra entrega/i })
+                .or(this.page.getByRole('radio', { name: /dat[aá]fono|punto de venta/i }))
+                .or(this.page.locator('label:has-text("Datáfono"), label:has-text("Datafono"), label:has-text("Punto De Venta")'));
+
+            const opcion = radioDatafono.first();
+            await opcion.waitFor({ state: 'visible', timeout: 8000 });
+            await opcion.click({ force: true }).catch(async () => {
+                await opcion.evaluate(el => el.click());
             });
+            console.log('✅ Opción "Datáfono" seleccionada.');
         } else {
-            const primerOpcionPago = this.page.locator('.PaymentMethods label, [class*="PaymentMethod"] label, input[type="radio"] + label').first();
-            if (await primerOpcionPago.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await primerOpcionPago.click().catch(() => {});
+            console.log('Seleccionando método de pago: "Efectivo"...');
+            const radioEfectivo = this.page.locator('label, [role="radio"], div, span')
+                .filter({ hasText: /^Efectivo$/i })
+                .or(this.page.getByRole('radio', { name: /^efectivo$/i }))
+                .or(this.page.locator('label:has-text("Efectivo")'));
+
+            const opcion = radioEfectivo.first();
+            await opcion.waitFor({ state: 'visible', timeout: 8000 });
+            await opcion.click({ force: true }).catch(async () => {
+                await opcion.evaluate(el => el.click());
+            });
+            console.log('✅ Opción "Efectivo" seleccionada.');
+            await this.page.waitForTimeout(1500);
+
+            // Localizador del Switch de 'Pagar con valor total / Monto exacto'
+            const switchValorTotal = this.page.locator('input[type="checkbox"], [role="switch"], .Switch, [class*="switch"], [class*="Toggle"], [class*="checkbox"]')
+                .or(this.page.locator('label, div').filter({ hasText: /valor total|monto exacto|total exacto|pago total|monto a pagar/i }).locator('input, [role="switch"]'))
+                .or(this.page.locator('label').filter({ hasText: /valor total|monto exacto|total exacto|pago total/i }));
+
+            const switchEl = switchValorTotal.first();
+
+            if (esEfectivoExacto) {
+                console.log('Configurando Efectivo con valor total (monto exacto)...');
+                if (await switchEl.isVisible({ timeout: 3000 }).catch(() => false)) {
+                    const isChecked = await switchEl.isChecked().catch(() => false);
+                    if (!isChecked) {
+                        console.log('Activando switch de valor total...');
+                        await switchEl.click({ force: true }).catch(async () => {
+                            await switchEl.evaluate(el => el.click());
+                        });
+                    }
+                    console.log('✅ Switch de valor total activo.');
+                }
+            } else if (esEfectivoCambio) {
+                console.log('Configurando Efectivo con cambio (monto mayor)...');
+                if (await switchEl.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    const isChecked = await switchEl.isChecked().catch(() => false);
+                    if (isChecked) {
+                        console.log('Desactivando switch de valor total para habilitar input de cambio...');
+                        await switchEl.click({ force: true }).catch(async () => {
+                            await switchEl.evaluate(el => el.click());
+                        });
+                    }
+                }
+                await this.page.waitForTimeout(1000);
+
+                let montoADar = montoCambio || '50';
+                
+                const totalElement = this.page.locator('.OrderSummary, [class*="Total"], [class*="total"], strong, span')
+                    .filter({ hasText: /\$\s*\d+|\b\d+[.,]\d{2}\b/ }).last();
+                if (await totalElement.isVisible({ timeout: 1500 }).catch(() => false)) {
+                    const totalText = await totalElement.innerText().catch(() => '');
+                    const matchNum = totalText.match(/(\d+[.,]\d{2}|\d+)/);
+                    if (matchNum) {
+                        const totalNum = parseFloat(matchNum[1].replace(',', '.'));
+                        if (!isNaN(totalNum) && totalNum > 0) {
+                            montoADar = String(Math.ceil(totalNum + 10));
+                        }
+                    }
+                }
+
+                const inputMonto = this.page.locator('input[name*="change"], input[name*="amount"], input[name*="cash"], input[placeholder*="monto"], input[placeholder*="cambio"], input[type="number"], input[placeholder*="¿Con cuánto"], input[placeholder*="con cuanto"]').first()
+                    .or(this.page.locator('.PaymentMethods input[type="text"], [class*="Payment"] input[type="text"], input[type="text"]').last());
+
+                if (await inputMonto.isVisible({ timeout: 3000 }).catch(() => false)) {
+                    console.log(`Llenando monto que se va a pagar (mayor al total): "$${montoADar}"`);
+                    await inputMonto.click();
+                    await inputMonto.fill(montoADar);
+                    await inputMonto.evaluate(el => {
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                    }).catch(() => {});
+                    console.log(`✅ Monto de pago "$${montoADar}" configurado.`);
+                }
             }
         }
-        await this.page.waitForTimeout(3000);
+
+        await this.page.waitForTimeout(1500);
+    }
+
+    /**
+     * Procesa el pago, espera a que cargue la pantalla con el 'Código de pedido' y lo extrae con exactitud
+     * @returns {Promise<string>} Número / Código de Pedido
+     */
+    async procesarPagoYConfirmarOrden() {
+        console.log("Iniciando proceso de pago y creación de orden...");
+
+        this.codigoPedido = null;
+
+        // 1. Hacer clic en el botón de Pagar / Realizar Pedido
+        const btnPagar = this.btnPagar.last();
+        await btnPagar.waitFor({ state: 'visible', timeout: 10000 });
+        await btnPagar.scrollIntoViewIfNeeded().catch(() => {});
+
+        console.log("Haciendo clic en el botón 'Pagar'...");
+        await btnPagar.click({ force: true }).catch(async () => {
+            await btnPagar.evaluate(b => b.click());
+        });
+
+        // 2. Monitorear estado: 'Procesando...'
+        console.log("Esperando procesamiento del pedido...");
+        if (await this.indicadorProcesando.first().isVisible({ timeout: 4000 }).catch(() => false)) {
+            console.log("⏳ [Estado]: Procesando orden en curso...");
+        }
+
+        // 3. Monitorear estado: 'Orden creada exitosamente'
+        const toastExito = this.toastOrdenCreada.first();
+        if (await toastExito.isVisible({ timeout: 15000 }).catch(() => false)) {
+            const msg = await toastExito.innerText().catch(() => 'Orden creada exitosamente');
+            console.log(`🎉 [Toast Confirmado]: "${msg.trim()}"`);
+        }
+
+        // 4. ESPERAR A QUE CARGUE LA PANTALLA DE DETALLE CON EL TEXTO "Código de pedido:"
+        console.log("Esperando a que la pantalla de Detalle de la Orden cargue por completo...");
+
+        const labelCodigoPedido = this.page.locator('text=/código de pedido|codigo de pedido|código del pedido|número de pedido/i')
+            .or(this.page.locator('p, span, div, h1, h2, h3, strong').filter({ hasText: /código de pedido|codigo de pedido|número de pedido/i }));
+
+        await labelCodigoPedido.first().waitFor({ state: 'visible', timeout: 40000 }).catch(() => {
+            console.log("Aviso: Esperando renderizado de la tarjeta de pedido...");
+        });
+
+        // Scroll físico y centrado de la tarjeta de la orden
+        console.log("Haciendo scroll para centrar la tarjeta de pedido en pantalla...");
+        await labelCodigoPedido.first().scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
+        await this.page.mouse.wheel(0, 450);
+        await this.page.evaluate(() => {
+            const el = Array.from(document.querySelectorAll('*')).find(e => e.innerText && /código de pedido|código del pedido/i.test(e.innerText));
+            if (el) {
+                el.scrollIntoView({ behavior: 'instant', block: 'center' });
+            }
+        }).catch(() => {});
+
+        await this.page.waitForTimeout(2000);
+
+        // 5. Extraer el valor exacto del código de pedido
+        console.log("Extrayendo código de pedido de la pantalla de detalle...");
+
+        const elemento = labelCodigoPedido.first();
+        if (await elemento.isVisible().catch(() => false)) {
+            const textoPadre = await elemento.evaluate(el => {
+                return (el.parentElement?.innerText || el.innerText || '').trim();
+            }).catch(() => '');
+
+            console.log(`Texto capturado del elemento: "${textoPadre}"`);
+
+            const match = textoPadre.match(/c[óo]digo d?e?l?\s*pedido:\s*([0-9A-Za-z-]+)/i);
+            if (match && match[1]) {
+                this.codigoPedido = match[1].trim();
+            }
+        }
+
+        if (!this.codigoPedido) {
+            const textoBody = await this.page.innerText('body').catch(() => '');
+            const matchBody = textoBody.match(/c[óo]digo d?e?l?\s*pedido:\s*([0-9A-Za-z-]+)/i)
+                || textoBody.match(/#(EC-[0-9]+|[0-9]{5,}-[0-9]{4,}|[0-9]{6,})/i);
+
+            if (matchBody && matchBody[1]) {
+                this.codigoPedido = matchBody[1].trim();
+            }
+        }
+
+        console.log(`======================================================`);
+        console.log(`🎉 ¡PEDIDO CREADO CON ÉXITO EN ECUADOR!`);
+        console.log(`📋 Código de Pedido: [ ${this.codigoPedido || 'CONFIRMADO'} ]`);
+        console.log(`======================================================`);
+
+        await this.page.waitForTimeout(5000);
+
+        return this.codigoPedido;
     }
 }

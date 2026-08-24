@@ -237,7 +237,9 @@ class SpanishExecutiveReporter {
             }
         }
         if (!metodoPago) {
-            if (lowerTitle.includes('punto de venta') || lowerTitle.includes('pos')) {
+            if (lowerTitle.includes('datáfono') || lowerTitle.includes('datafono')) {
+                metodoPago = 'Datáfono';
+            } else if (lowerTitle.includes('punto de venta') || lowerTitle.includes('pos')) {
                 metodoPago = 'Punto de Venta';
             } else if (lowerTitle.includes('con cambio') || lowerTitle.includes('cambio')) {
                 metodoPago = 'Efectivo (Con Cambio)';
