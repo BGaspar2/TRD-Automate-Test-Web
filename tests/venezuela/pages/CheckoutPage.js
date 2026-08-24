@@ -302,10 +302,17 @@ export class CheckoutPage {
 
         // Scroll para enfocar y centrar la tarjeta de pedido en la pantalla (Lugar de entrega, Restaurante, Código de pedido)
         console.log("Haciendo scroll para centrar la tarjeta de pedido en pantalla...");
-        await labelCodigoPedido.first().scrollIntoViewIfNeeded().catch(() => {});
+        await labelCodigoPedido.first().scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
+        
+        // Enviar evento de rueda de ratón (mouse wheel) y forzar scroll en DOM
+        await this.page.mouse.wheel(0, 450);
         await this.page.evaluate(() => {
-            window.scrollBy({ top: 150, behavior: 'smooth' });
-        });
+            const el = Array.from(document.querySelectorAll('*')).find(e => e.innerText && e.innerText.includes('Código de pedido:'));
+            if (el) {
+                el.scrollIntoView({ behavior: 'instant', block: 'center' });
+            }
+        }).catch(() => {});
+
         await this.page.waitForTimeout(2000);
 
         // 5. Extraer el valor exacto del código de pedido (ej. '0000002961-013401')
