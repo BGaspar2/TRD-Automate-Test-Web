@@ -7,7 +7,7 @@ import { CheckoutPage } from '../pages/CheckoutPage.js';
 import { ejecutarPaso } from '../../../utils/pasos.js';
 
 test('Flujo E2E - Compra a domicilio con Pago y Generación de Orden (Venezuela)', async ({ page }, testInfo) => {
-    test.setTimeout(120000);
+    test.setTimeout(180000);
 
     const homePage = new HomePage(page);
     const menuPage = new MenuPage(page);

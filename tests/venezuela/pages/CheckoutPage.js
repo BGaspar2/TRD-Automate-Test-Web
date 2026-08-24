@@ -259,7 +259,7 @@ export class CheckoutPage {
     }
 
     /**
-     * Procesa el pago, espera a que cargue completamente la pantalla de detalle de orden y extrae el número de pedido
+     * Procesa el pago, espera a que cargue la pantalla con el 'Código de pedido' y lo extrae con exactitud
      * @returns {Promise<string>} Número / Código de Pedido
      */
     async procesarPagoYConfirmarOrden() {
@@ -267,24 +267,7 @@ export class CheckoutPage {
 
         this.codigoPedido = null;
 
-        // 1. Escuchar la llamada a la API de creación de órdenes / checkout para interceptar el código
-        this.page.on('response', async resp => {
-            const url = resp.url();
-            if ((url.includes('order') || url.includes('checkout') || url.includes('pedido') || url.includes('transaction')) && resp.status() >= 200 && resp.status() < 300) {
-                try {
-                    const json = await resp.json().catch(() => null);
-                    if (json) {
-                        const id = json.orderNumber || json.orderId || json.code || json.id || json.data?.orderNumber || json.data?.orderId || json.data?.code || json.data?.id;
-                        if (id && String(id).trim().length >= 3 && !['ok', 'true'].includes(String(id).toLowerCase())) {
-                            this.codigoPedido = String(id).trim();
-                            console.log(`⚡ [API Interceptada]: Código de orden encontrado = [ ${this.codigoPedido} ]`);
-                        }
-                    }
-                } catch (e) {}
-            }
-        });
-
-        // 2. Hacer clic en el botón de Pagar / Realizar Pedido
+        // 1. Hacer clic en el botón de Pagar / Realizar Pedido
         const btnPagar = this.btnPagar.last();
         await btnPagar.waitFor({ state: 'visible', timeout: 10000 });
         await btnPagar.scrollIntoViewIfNeeded().catch(() => {});
@@ -294,97 +277,66 @@ export class CheckoutPage {
             await btnPagar.evaluate(b => b.click());
         });
 
-        // 3. Monitorear estado: 'Procesando...'
+        // 2. Monitorear estado: 'Procesando...'
         console.log("Esperando procesamiento del pedido...");
         if (await this.indicadorProcesando.first().isVisible({ timeout: 4000 }).catch(() => false)) {
             console.log("⏳ [Estado]: Procesando orden en curso...");
         }
 
-        // 4. Monitorear estado: 'Orden creada exitosamente'
+        // 3. Monitorear estado: 'Orden creada exitosamente'
         const toastExito = this.toastOrdenCreada.first();
         if (await toastExito.isVisible({ timeout: 15000 }).catch(() => false)) {
             const msg = await toastExito.innerText().catch(() => 'Orden creada exitosamente');
             console.log(`🎉 [Toast Confirmado]: "${msg.trim()}"`);
         }
 
-        // 5. ESPERAR A QUE CARGUE POR COMPLETO LA PANTALLA DE DETALLE DE LA ORDEN
+        // 4. ESPERAR A QUE CARGUE LA PANTALLA DE DETALLE CON EL TEXTO "Código de pedido:"
         console.log("Esperando a que la pantalla de Detalle de la Orden cargue por completo...");
-        
-        // Esperar cambio de URL o desaparición de la pantalla de checkout
-        await this.page.waitForURL(url => !url.pathname.includes('/checkout') && !url.pathname.includes('/carrito'), { timeout: 35000 }).catch(() => {
-            console.log("Aviso: Esperando renderizado de la vista de orden...");
+
+        const labelCodigoPedido = this.page.locator('text=/código de pedido|codigo de pedido/i')
+            .or(this.page.locator('p, span, div, h1, h2, h3, strong').filter({ hasText: /código de pedido|codigo de pedido/i }));
+
+        await labelCodigoPedido.first().waitFor({ state: 'visible', timeout: 40000 }).catch(() => {
+            console.log("Aviso: Esperando renderizado de la tarjeta de pedido...");
         });
 
-        // Esperar a que los elementos de la orden estén completamente renderizados
-        const contenedorDetalle = this.page.locator('.OrderDetail, .OrderSuccess, [class*="OrderDetail"], [class*="OrderSuccess"], [class*="order-detail"], [class*="order-success"], [class*="confirmation"], [class*="Confirmation"], main')
-            .filter({ hasText: /pedido|orden|detalle|código|número|gracias|preparación|recibido|confirmación/i });
+        // Pausa breve para estabilización del contenido dinámico
+        await this.page.waitForTimeout(3000);
 
-        await contenedorDetalle.first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {
-            console.log("Aviso: Esperando contenedor principal de la orden...");
-        });
+        // 5. Extraer el valor exacto del código de pedido (ej. '0000002961-013401')
+        console.log("Extrayendo código de pedido de la pantalla de detalle...");
 
-        // Pausa de estabilización para asegurar que los datos dinámicos terminen de pintarse en el DOM
-        await this.page.waitForLoadState('networkidle').catch(() => {});
-        await this.page.waitForTimeout(6000);
+        const elemento = labelCodigoPedido.first();
+        if (await elemento.isVisible().catch(() => false)) {
+            const textoPadre = await elemento.evaluate(el => {
+                return (el.parentElement?.innerText || el.innerText || '').trim();
+            }).catch(() => '');
 
-        // 6. Extraer el código de orden del DOM de la pantalla
+            console.log(`Texto capturado del elemento: "${textoPadre}"`);
+
+            const match = textoPadre.match(/c[óo]digo de pedido:\s*([0-9A-Za-z-]+)/i);
+            if (match && match[1]) {
+                this.codigoPedido = match[1].trim();
+            }
+        }
+
+        // Fallback: Si no se extrajo del elemento padre, buscar en el texto completo del body
         if (!this.codigoPedido) {
-            console.log("Extrayendo número de pedido desde los elementos de la pantalla...");
+            const textoBody = await this.page.innerText('body').catch(() => '');
+            const matchBody = textoBody.match(/c[óo]digo de pedido:\s*([0-9A-Za-z-]+)/i)
+                || textoBody.match(/#(VE-[0-9]+|[0-9]{5,}-[0-9]{4,}|[0-9]{6,})/i);
 
-            const selectoresId = [
-                this.page.locator('[data-testid*="order-id"], [data-testid*="order-number"], [class*="order-id"], [class*="orderId"], [class*="orderNumber"], [class*="order-number"]'),
-                this.page.locator('h1, h2, h3, h4, strong, p, span').filter({ hasText: /#\s*[0-9]{4,}|#\s*[A-Za-z0-9_-]{5,}|VE-\d+/ }),
-                this.page.locator('h1, h2, h3, h4, strong, p, span').filter({ hasText: /número de pedido|código de pedido|número de orden|código de orden|orden #|pedido #/i })
-            ];
-
-            for (const loc of selectoresId) {
-                const count = await loc.count().catch(() => 0);
-                for (let i = 0; i < count; i++) {
-                    const txt = await loc.nth(i).innerText().catch(() => '');
-                    const match = txt.match(/#\s*([0-9]{4,}|[A-Za-z0-9_-]{5,})/i)
-                        || txt.match(/(?:pedido|orden|order)\s*(?:#|n[úu]mero|code)?[:\s]*([0-9]{4,}|[A-Za-z0-9_-]{5,})/i)
-                        || txt.match(/\b(VE-\d{4,}|\d{5,})\b/i);
-
-                    if (match && match[1]) {
-                        const candidato = match[1].trim();
-                        if (!['pagar', 'cancelar', 'continuar', 'volver', 'inicio'].includes(candidato.toLowerCase()) && candidato.length >= 4) {
-                            this.codigoPedido = candidato;
-                            break;
-                        }
-                    }
-                }
-                if (this.codigoPedido) break;
-            }
-
-            // Si aún no se encontró, extraer con regex global en body
-            if (!this.codigoPedido) {
-                const textoCompleto = await this.page.innerText('body').catch(() => '');
-                const matchGlobal = textoCompleto.match(/#(VE-[0-9]+|[0-9]{4,}|[A-Za-z0-9]{5,})/i)
-                    || textoCompleto.match(/(?:número de pedido|código de pedido|número de orden|código de orden)[:\s]*#?\s*([0-9]{4,}|[A-Za-z0-9_-]{5,})/i);
-
-                if (matchGlobal && matchGlobal[1]) {
-                    const cand = matchGlobal[1].trim();
-                    if (!['pagar', 'cancelar', 'continuar'].includes(cand.toLowerCase()) && cand.length >= 4) {
-                        this.codigoPedido = cand;
-                    }
-                }
-            }
-
-            // Fallback con ID de URL
-            if (!this.codigoPedido) {
-                const matchUrl = this.page.url().match(/(?:orden|pedido|order|success)\/([A-Za-z0-9-]+)/i);
-                if (matchUrl && matchUrl[1] && matchUrl[1].length >= 4) {
-                    this.codigoPedido = matchUrl[1];
-                }
+            if (matchBody && matchBody[1]) {
+                this.codigoPedido = matchBody[1].trim();
             }
         }
 
         console.log(`======================================================`);
         console.log(`🎉 ¡PEDIDO CREADO CON ÉXITO EN VENEZUELA!`);
-        console.log(`📋 Número / Código de Pedido: [ ${this.codigoPedido || 'CONFIRMADO'} ]`);
+        console.log(`📋 Código de Pedido: [ ${this.codigoPedido || 'CONFIRMADO'} ]`);
         console.log(`======================================================`);
 
-        // Pausa adicional para que el reporte ejecutivo capture con total claridad la pantalla completa de la orden
+        // Pausa de 5 segundos para que la captura de pantalla del reporte ejecutivo registre la pantalla de detalle
         await this.page.waitForTimeout(5000);
 
         return this.codigoPedido;
