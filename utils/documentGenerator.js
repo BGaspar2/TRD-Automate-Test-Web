@@ -110,8 +110,8 @@ export function generarDniArgentinaValido() {
 }
 
 export function generarTelefonoArgentina() {
-    const random8 = Math.floor(10000000 + Math.random() * 90000000);
-    return `11${random8}`;
+    const random7 = Math.floor(1000000 + Math.random() * 9000000);
+    return `911${random7}`;
 }
 
 // ==========================================
