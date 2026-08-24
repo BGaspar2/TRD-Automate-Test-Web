@@ -206,6 +206,59 @@ export class CheckoutPage {
         await this.page.waitForTimeout(3000);
     }
 
+    async asegurarDatosFacturacion() {
+        console.log("Verificando checkbox 'Utilizar mi información para la facturación'...");
+
+        const seccionFacturacion = this.page.locator('text=/datos de facturaci[óo]n/i').first();
+        if (await seccionFacturacion.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await seccionFacturacion.scrollIntoViewIfNeeded().catch(() => {});
+        }
+
+        const checkLabel = this.page.locator('label, div, span')
+            .filter({ hasText: /utilizar mi informaci[óo]n para la facturaci[óo]n|misma informaci[óo]n para facturaci[óo]n/i })
+            .or(this.page.getByText(/utilizar mi informaci[óo]n para la facturaci[óo]n/i))
+            .last();
+
+        if (await checkLabel.isVisible({ timeout: 3000 }).catch(() => false)) {
+            const inputCheck = checkLabel.locator('input[type="checkbox"]').first()
+                .or(this.page.locator('input[type="checkbox"][name*="billing"], input[type="checkbox"][id*="billing"], input[type="checkbox"][name*="same"]').first());
+
+            let isChecked = false;
+            if (await inputCheck.isVisible({ timeout: 1000 }).catch(() => false)) {
+                isChecked = await inputCheck.isChecked().catch(() => false);
+            } else {
+                isChecked = await checkLabel.evaluate(el => {
+                    const inp = el.querySelector('input[type="checkbox"]');
+                    if (inp) return inp.checked;
+                    return el.classList.contains('active') || el.classList.contains('checked') || el.getAttribute('aria-checked') === 'true';
+                }).catch(() => false);
+            }
+
+            if (!isChecked) {
+                console.log("Marcando checkbox: 'Utilizar mi información para la facturación'...");
+                await checkLabel.click({ force: true }).catch(async () => {
+                    await checkLabel.evaluate(el => el.click());
+                });
+                await this.page.evaluate(() => {
+                    const labels = Array.from(document.querySelectorAll('label, div, span'));
+                    const match = labels.find(l => /utilizar mi informaci[óo]n para la facturaci[óo]n/i.test(l.innerText || ''));
+                    if (match) {
+                        match.click();
+                        const inp = match.querySelector('input[type="checkbox"]');
+                        if (inp) {
+                            inp.checked = true;
+                            inp.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    }
+                }).catch(() => {});
+                console.log("✅ Checkbox de facturación marcado.");
+            } else {
+                console.log("✅ Checkbox de facturación ya se encontraba marcado.");
+            }
+        }
+        await this.page.waitForTimeout(1000);
+    }
+
     async llenarDatosPersonales(cliente) {
         console.log("Llenando datos personales del cliente...");
         await this.llenarCampoSeguro(this.inputName, cliente.name);
@@ -213,6 +266,10 @@ export class CheckoutPage {
         await this.llenarCampoSeguro(this.inputEmail, cliente.email);
         await this.llenarCampoSeguro(this.inputPhoneCustomer, cliente.phone);
         await this.llenarCampoSeguro(this.inputDocument, cliente.document);
+        
+        // Asegurar siempre el check de 'Utilizar mi información para la facturación'
+        await this.asegurarDatosFacturacion();
+
         await this.page.waitForTimeout(2000);
     }
 
