@@ -24,7 +24,7 @@ export const testData = {
     },
     paymentMethodId: "#Efectivo",
     registration: {
-        baseEmail: process.env.TEST_EMAIL || "bryan.gaspar@trade.ec",
+        baseEmail: process.env.TEST_EMAIL || "[EMAIL_ADDRESS]",
         timeoutOtpMs: 55000
     }
 };
