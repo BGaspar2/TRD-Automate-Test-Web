@@ -232,51 +232,55 @@ export class CheckoutPage {
         await seccionMetodoPago.scrollIntoViewIfNeeded({ timeout: 4000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        if (esDatafono) {
-            console.log('Seleccionando método de pago: "Datáfono"...');
-            const radioDatafono = this.page.locator('label, [role="radio"], div, span')
-                .filter({ hasText: /^Datáfono$|^Datafono$/i })
-                .or(this.page.getByRole('radio', { name: /dat[aá]fono/i }))
-                .or(this.page.locator('label:has-text("Datáfono"), label:has-text("Datafono")'));
+        const nombreBuscar = esDatafono ? 'Datáfono' : 'Efectivo';
+        console.log(`Seleccionando método de pago en Colombia: "${nombreBuscar}"...`);
 
-            const opcion = radioDatafono.first();
-            await opcion.waitFor({ state: 'visible', timeout: 8000 });
-            await opcion.scrollIntoViewIfNeeded().catch(() => {});
-            await opcion.click({ force: true }).catch(async () => {
-                await opcion.evaluate(el => el.click());
-            });
+        // 2. Localizar y hacer clic en el radio/texto específico
+        const radioTexto = this.page.getByText(new RegExp(`^${nombreBuscar}$`, 'i'))
+            .or(this.page.getByRole('radio', { name: new RegExp(nombreBuscar, 'i') }))
+            .or(this.page.getByLabel(new RegExp(nombreBuscar, 'i')));
 
-            // Fallback directo por evento
-            await this.page.evaluate(() => {
-                const labels = Array.from(document.querySelectorAll('label, div, span'));
-                const match = labels.find(l => /^dat[aá]fono$/i.test((l.innerText || '').trim()));
-                if (match) match.click();
-            }).catch(() => {});
+        const opcion = radioTexto.first();
+        await opcion.waitFor({ state: 'visible', timeout: 8000 });
+        await opcion.scrollIntoViewIfNeeded().catch(() => {});
+        await opcion.click({ force: true });
 
-            console.log('✅ Opción "Datáfono" seleccionada.');
-        } else {
-            console.log('Seleccionando método de pago: "Efectivo"...');
-            const radioEfectivo = this.page.locator('label, [role="radio"], div, span')
-                .filter({ hasText: /^Efectivo$/i })
-                .or(this.page.getByRole('radio', { name: /^efectivo$/i }))
-                .or(this.page.locator('label:has-text("Efectivo")'));
+        // 3. Forzar activación en DOM del input radio correspondiente
+        await this.page.evaluate((nombre) => {
+            const clean = nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const allElements = Array.from(document.querySelectorAll('label, div, span'));
+            for (const el of allElements) {
+                const txt = (el.innerText || '').trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                if (txt === clean) {
+                    const input = el.querySelector('input[type="radio"]') || 
+                                  (el.getAttribute('for') ? document.getElementById(el.getAttribute('for')) : null) ||
+                                  el.closest('label')?.querySelector('input[type="radio"]') ||
+                                  el.parentElement?.querySelector('input[type="radio"]');
+                    if (input) {
+                        input.checked = true;
+                        input.click();
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    el.click();
+                    break;
+                }
+            }
+        }, nombreBuscar).catch(() => {});
 
-            const opcion = radioEfectivo.first();
-            await opcion.waitFor({ state: 'visible', timeout: 8000 });
-            await opcion.scrollIntoViewIfNeeded().catch(() => {});
-            await opcion.click({ force: true }).catch(async () => {
-                await opcion.evaluate(el => el.click());
-            });
+        await this.page.waitForTimeout(1500);
 
-            await this.page.evaluate(() => {
-                const labels = Array.from(document.querySelectorAll('label, div, span'));
-                const match = labels.find(l => /^efectivo$/i.test((l.innerText || '').trim()));
-                if (match) match.click();
-            }).catch(() => {});
-
-            console.log('✅ Opción "Efectivo" seleccionada.');
+        // 4. VALIDACIÓN: Asegurar que "Tarjeta" no siga seleccionada
+        const advertenciaTarjeta = this.page.locator('text=/no olvides ingresar tu tarjeta/i');
+        if (await advertenciaTarjeta.isVisible({ timeout: 1500 }).catch(() => false)) {
+            console.log(`Aviso: "Tarjeta" sigue activa, reintentando clic en el radio circular de "${nombreBuscar}"...`);
+            const fallbackRadio = this.page.locator('label').filter({ hasText: new RegExp(nombreBuscar, 'i') }).first();
+            await fallbackRadio.click({ force: true }).catch(() => {});
             await this.page.waitForTimeout(1500);
+        }
 
+        console.log(`✅ Opción "${nombreBuscar}" seleccionada.`);
+
+        if (!esDatafono) {
             // Localizador del Switch de 'Pagar con valor total / Monto exacto'
             const switchValorTotal = this.page.locator('input[type="checkbox"], [role="switch"], .Switch, [class*="switch"], [class*="Toggle"], [class*="checkbox"]')
                 .or(this.page.locator('label, div').filter({ hasText: /valor total|monto exacto|total exacto|pago total|monto a pagar/i }).locator('input, [role="switch"]'))
