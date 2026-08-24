@@ -282,61 +282,66 @@ export class CheckoutPage {
 
         // 1. Localizar y hacer clic en el botón negro '➕ Nueva tarjeta'
         for (let intento = 1; intento <= 5; intento++) {
-            // Localizar el elemento <button> o contenedor directo
-            const btnNuevaTarjeta = this.page.getByRole('button', { name: /nueva tarjeta/i })
-                .or(this.page.locator('button').filter({ hasText: /nueva tarjeta/i }))
-                .or(this.page.locator('[class*="button" i], [role="button"], div, a').filter({ hasText: /nueva tarjeta/i }))
-                .first();
+            console.log(`Intento ${intento}: Haciendo clic en el botón '➕ Nueva tarjeta'...`);
 
-            if (await btnNuevaTarjeta.isVisible({ timeout: 3000 }).catch(() => false)) {
-                console.log(`Intento ${intento}: Haciendo clic en el botón '➕ Nueva tarjeta'...`);
+            // Estrategia A: Playwright text selector directo
+            await this.page.click('text=/nueva tarjeta/i', { timeout: 3000, force: true }).catch(() => {});
+            
+            // Estrategia B: Localizador de botón
+            const btnNuevaTarjeta = this.page.locator('button, [role="button"], div, a, span')
+                .filter({ hasText: /nueva tarjeta/i })
+                .last();
+
+            if (await btnNuevaTarjeta.isVisible({ timeout: 2000 }).catch(() => false)) {
                 await btnNuevaTarjeta.scrollIntoViewIfNeeded().catch(() => {});
-                
                 const box = await btnNuevaTarjeta.boundingBox().catch(() => null);
                 if (box) {
                     await this.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2).catch(() => {});
                 }
-                
-                await btnNuevaTarjeta.click().catch(async () => {
-                    await btnNuevaTarjeta.click({ force: true });
-                });
+                await btnNuevaTarjeta.click({ force: true }).catch(() => {});
             }
 
-            // Disparo integral en DOM y React Props/Fiber
-            const clickInfo = await this.page.evaluate(() => {
+            // Estrategia C: Invocación en todos los ancestros y React Fiber
+            await this.page.evaluate(() => {
                 const all = Array.from(document.querySelectorAll('*'));
-                const candidates = all.filter(el => /nueva tarjeta/i.test((el.innerText || el.textContent || '').trim()) && (el.innerText || '').length < 35);
-                
-                for (const el of candidates) {
-                    const btn = el.closest('button') || el.closest('[role="button"]') || el.closest('a') || el;
-                    const rect = btn.getBoundingClientRect();
-                    if (rect.width > 0 && rect.height > 0) {
-                        btn.focus?.();
-                        btn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, view: window }));
-                        btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
-                        btn.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, view: window }));
-                        btn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
-                        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-                        btn.click?.();
-
-                        const rKey = Object.keys(btn).find(k => k.startsWith('__reactProps'));
-                        if (rKey && btn[rKey]?.onClick) {
-                            btn[rKey].onClick({ preventDefault: () => {}, stopPropagation: () => {}, target: btn, currentTarget: btn });
+                const textNode = all.reverse().find(el => /nueva tarjeta/i.test((el.innerText || el.textContent || '').trim()) && (el.innerText || '').length < 35);
+                if (textNode) {
+                    let curr = textNode;
+                    let depth = 0;
+                    while (curr && curr !== document.body && depth < 5) {
+                        curr.click();
+                        curr.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                        curr.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                        curr.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                        
+                        const rKey = Object.keys(curr).find(k => k.startsWith('__reactProps'));
+                        if (rKey && curr[rKey]?.onClick) {
+                            curr[rKey].onClick({ preventDefault: () => {}, stopPropagation: () => {} });
                         }
-                        return { found: true, tag: btn.tagName, rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } };
+
+                        const fKey = Object.keys(curr).find(k => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'));
+                        if (fKey && curr[fKey]) {
+                            let fiber = curr[fKey];
+                            let fDepth = 0;
+                            while (fiber && fDepth < 6) {
+                                if (fiber.memoizedProps?.onClick) {
+                                    fiber.memoizedProps.onClick({ preventDefault: () => {}, stopPropagation: () => {} });
+                                }
+                                fiber = fiber.return;
+                                fDepth++;
+                            }
+                        }
+
+                        curr = curr.parentElement;
+                        depth++;
                     }
                 }
-                return { found: false };
-            }).catch(() => null);
-
-            if (clickInfo?.found && clickInfo.rect) {
-                await this.page.mouse.click(clickInfo.rect.x + clickInfo.rect.w / 2, clickInfo.rect.y + clickInfo.rect.h / 2).catch(() => {});
-            }
+            }).catch(() => {});
 
             await this.page.waitForTimeout(2000);
 
             // Verificar si el modal ya abrió
-            const modalAbierto = await this.page.locator('.Modal, [role="dialog"], [class*="modal" i], [class*="dialog" i], [class*="drawer" i]').first().isVisible({ timeout: 1000 }).catch(() => false);
+            const modalAbierto = await this.page.locator('.Modal, [role="dialog"], [class*="modal" i], [class*="dialog" i], [class*="drawer" i], input[placeholder*="número" i]').first().isVisible({ timeout: 1000 }).catch(() => false);
             if (modalAbierto) {
                 console.log("✅ Modal de tarjeta abierto exitosamente.");
                 break;
