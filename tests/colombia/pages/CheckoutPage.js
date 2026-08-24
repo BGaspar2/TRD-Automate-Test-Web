@@ -373,14 +373,15 @@ export class CheckoutPage {
         }
 
         if (!esDatafono) {
-            // Localizador del Switch de 'Pagar con valor total / Monto exacto'
-            const switchValorTotal = this.page.locator('input[type="checkbox"], [role="switch"], .Switch, [class*="switch"], [class*="Toggle"], [class*="checkbox"]')
-                .or(this.page.locator('label, div').filter({ hasText: /valor total|monto exacto|total exacto|pago total|monto a pagar/i }).locator('input, [role="switch"]'))
+            // Localizador estricto del Switch de 'Pagar con valor total / Monto exacto' (NUNCA tocar el checkbox de facturación)
+            const switchValorTotal = this.page.locator('label, div, p')
+                .filter({ hasText: /valor total|monto exacto|total exacto|pago total|monto a pagar/i })
+                .locator('input, [role="switch"], .Switch, [class*="switch"], [class*="Toggle"], [class*="checkbox"]')
                 .or(this.page.locator('label').filter({ hasText: /valor total|monto exacto|total exacto|pago total/i }));
 
             const switchEl = switchValorTotal.first();
 
-            const switchPresente = await switchEl.isVisible({ timeout: 3000 }).catch(() => false);
+            const switchPresente = await switchEl.isVisible({ timeout: 2000 }).catch(() => false);
             if (switchPresente) {
                 const estaActivo = await switchEl.evaluate(node => {
                     if (node.tagName === 'INPUT') return node.checked;
@@ -442,6 +443,9 @@ export class CheckoutPage {
             }
         }
 
+        // Re-verificar que el checkbox de facturación permanezca marcado
+        await this.asegurarDatosFacturacion();
+
         await this.page.waitForTimeout(1500);
     }
 
@@ -453,6 +457,9 @@ export class CheckoutPage {
         console.log("Iniciando proceso de pago y creación de orden...");
 
         this.codigoPedido = null;
+
+        // Asegurar una última vez que los datos de facturación estén marcados
+        await this.asegurarDatosFacturacion();
 
         // 1. Hacer clic en el botón de Pagar / Realizar Pedido
         const btnPagar = this.btnPagar.last();

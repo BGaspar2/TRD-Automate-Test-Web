@@ -256,9 +256,10 @@ export class CheckoutPage {
             console.log('✅ Opción "Efectivo" seleccionada.');
             await this.page.waitForTimeout(1500);
 
-            // Localizador del Switch de 'Pagar con valor total / Monto exacto'
-            const switchValorTotal = this.page.locator('input[type="checkbox"], [role="switch"], .Switch, [class*="switch"], [class*="Toggle"], [class*="checkbox"]')
-                .or(this.page.locator('label, div').filter({ hasText: /valor total|monto exacto|total exacto|pago total|monto a pagar/i }).locator('input, [role="switch"]'))
+            // Localizador estricto del Switch de 'Pagar con valor total / Monto exacto'
+            const switchValorTotal = this.page.locator('label, div, p')
+                .filter({ hasText: /valor total|monto exacto|total exacto|pago total|monto a pagar/i })
+                .locator('input, [role="switch"], .Switch, [class*="switch"], [class*="Toggle"], [class*="checkbox"]')
                 .or(this.page.locator('label').filter({ hasText: /valor total|monto exacto|total exacto|pago total/i }));
 
             const switchEl = switchValorTotal.first();
