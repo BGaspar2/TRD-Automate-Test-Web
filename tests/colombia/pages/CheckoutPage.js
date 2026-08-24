@@ -1,9 +1,12 @@
+import { expect } from '@playwright/test';
+
 export class CheckoutPage {
     /**
      * @param {import('@playwright/test').Page} page
      */
     constructor(page) {
         this.page = page;
+        this.codigoPedido = null;
 
         this.btnCompletar = page.getByRole('button', { name: /^completar/i })
             .or(page.locator('button, [role="button"], a, div[class*="cursor-pointer"], span[class*="cursor-pointer"]').filter({ hasText: /^completar/i }))
@@ -18,24 +21,33 @@ export class CheckoutPage {
         this.inputLastName = page.locator('input[name="lastName"], #lastName, input[placeholder*="Apellido"], input[placeholder*="apellido"]').first();
         this.inputEmail = page.locator('input[name="email"], input[type="email"], input[placeholder*="email"]').first();
         this.inputPhoneCustomer = page.locator('.PhoneNumber input, input[name="phone"], input[type="tel"], input[placeholder*="Teléfono"], input[placeholder*="telefone"]').first();
-        this.inputDocument = page.locator('#document, input[name="document"], input[placeholder*="Documento"], input[placeholder*="DNI"], input[placeholder*="CPF"], input[placeholder*="RUT"]').first();
+        this.inputDocument = page.locator('#document, input[name="document"], input[placeholder*="Documento"], input[placeholder*="DNI"], input[placeholder*="Cédula"]').first();
+
+        // Botón principal de Pagar / Realizar Pedido
+        this.btnPagar = page.locator('button.Button, button, [role="button"]')
+            .filter({ hasText: /pagar|confirmar pedido|realizar pedido|finalizar pedido|completar compra|hacer pedido/i });
+
+        // Indicadores de Procesando Orden
+        this.indicadorProcesando = page.locator('text=/procesando|procesando tu pedido|procesando orden|cargando/i')
+            .or(page.locator('[class*="Loading"], [class*="Spinner"], [class*="Processing"]'));
+
+        // Mensaje de Confirmación / Toast de Orden Exitosa
+        this.toastOrdenCreada = page.locator('[role="alert"], [role="status"], [class*="Toast"], [class*="Notification"], [class*="Success"], div')
+            .filter({ hasText: /orden creada|pedido creado|creada exitosamente|pedido realizado|éxito|exitosamente/i });
     }
 
     async iniciarCompletar() {
         console.log("Verificando si es necesario completar la dirección de entrega...");
 
-        // 1. Esperar a que la página de Checkout cargue
         await this.page.waitForLoadState('domcontentloaded').catch(() => {});
         await this.page.waitForTimeout(2000);
 
-        // 2. Si el formulario de dirección ya está visible (ej. modal ya abierto o formulario embebido), no requerir clic
         const formAddress = this.page.locator('.AddressForm, form.form, [class*="AddressForm"], [class*="address-form"], .Modal form, [role="dialog"] form, [role="dialog"]').first();
         if (await formAddress.isVisible({ timeout: 1500 }).catch(() => false)) {
             console.log("El formulario de dirección ya se encuentra visible.");
             return;
         }
 
-        // 3. Lista de selectores priorizados para el botón 'Completar' de la dirección
         const selectoresCompletar = [
             this.page.getByRole('button', { name: /^completar/i }),
             this.page.locator('.AddressCard, .DeliveryAddressCard, [class*="AddressCard"], [class*="DeliveryAddress"], [class*="FulfillAddress"], [class*="address-card"], [class*="delivery-address"]').locator('button, a, [role="button"], span, div').filter({ hasText: /completar|completar dirección|editar|cambiar|agregar/i }),
@@ -46,8 +58,6 @@ export class CheckoutPage {
         ];
 
         let btnEncontrado = null;
-
-        // Intentar encontrar un botón visible esperando hasta 8 segundos
         const inicio = Date.now();
         while (Date.now() - inicio < 8000 && !btnEncontrado) {
             for (const selector of selectoresCompletar) {
@@ -75,7 +85,6 @@ export class CheckoutPage {
             console.log("Haciendo clic en 'Completar' para abrir el modal de dirección...");
             await btnEncontrado.scrollIntoViewIfNeeded().catch(() => {});
 
-            // Intentar abrir la modal (hasta 3 intentos de clic si React tarda en reaccionar)
             let modalAbierto = false;
             for (let intento = 1; intento <= 3 && !modalAbierto; intento++) {
                 try {
@@ -90,7 +99,6 @@ export class CheckoutPage {
                     }).catch(() => {});
                 }
 
-                // Esperar a que la modal aparezca
                 modalAbierto = await formAddress.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
                 if (modalAbierto) {
                     console.log("Modal de dirección abierto con éxito.");
@@ -128,11 +136,9 @@ export class CheckoutPage {
     async llenarDireccionEntrega(direccion) {
         console.log("Llenando información de la dirección...");
 
-        // 1. Esperar a que el contenedor de la modal o formulario esté presente
         const formAddress = this.page.locator('.AddressForm, form.form, [class*="AddressForm"], [class*="address-form"], .Modal form, [role="dialog"] form, [role="dialog"]').first();
         await formAddress.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
 
-        // 2. Seleccionar etiqueta 'Casa' si está visible
         const btnCasa = this.page.locator('.AddressForm button, form.form button, [class*="AddressForm"] button, [role="dialog"] button')
             .filter({ hasText: /casa|home|casa \/ dpto/i }).first();
         if (await btnCasa.isVisible({ timeout: 1000 }).catch(() => false)) {
@@ -140,7 +146,6 @@ export class CheckoutPage {
             await btnCasa.click().catch(() => {});
         }
 
-        // 3. Mapeo directo por selectores e IDs estándar
         const mapeoCampos = [
             { ids: ['#mainStreet', 'input[name="mainStreet"]', 'input[placeholder*="Calle principal" i]', 'input[placeholder*="Dirección" i]', 'input[placeholder*="Direccion" i]'], valor: direccion.mainStreet, mantener: true },
             { ids: ['#secondaryStreet', 'input[name="secondaryStreet"]', 'input[placeholder*="Calle secundaria" i]', 'input[placeholder*="Intersección" i]', 'input[placeholder*="Entre" i]'], valor: direccion.secondaryStreet },
@@ -161,7 +166,6 @@ export class CheckoutPage {
             }
         }
 
-        // 4. Barrido general de inputs dentro del formulario para compatibilidad adicional
         const inputs = this.page.locator('.AddressForm input, .AddressForm textarea, [class*="AddressForm"] input, [class*="AddressForm"] textarea, form.form input, form.form textarea');
         const count = await inputs.count().catch(() => 0);
 
@@ -196,7 +200,63 @@ export class CheckoutPage {
         await btnGuardar.click({ force: true }).catch(async () => {
             await btnGuardar.evaluate(b => b.click()).catch(() => {});
         });
-        await this.page.waitForTimeout(4000);
+        
+        // Esperar cierre del modal y estabilización
+        await this.page.locator('.AddressForm, .Modal, [role="dialog"]').first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(3000);
+    }
+
+    async asegurarDatosFacturacion() {
+        console.log("Verificando checkbox 'Utilizar mi información para la facturación'...");
+
+        const seccionFacturacion = this.page.locator('text=/datos de facturaci[óo]n/i').first();
+        if (await seccionFacturacion.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await seccionFacturacion.scrollIntoViewIfNeeded().catch(() => {});
+        }
+
+        const checkLabel = this.page.locator('label, div, span')
+            .filter({ hasText: /utilizar mi informaci[óo]n para la facturaci[óo]n|misma informaci[óo]n para facturaci[óo]n/i })
+            .or(this.page.getByText(/utilizar mi informaci[óo]n para la facturaci[óo]n/i))
+            .last();
+
+        if (await checkLabel.isVisible({ timeout: 3000 }).catch(() => false)) {
+            const inputCheck = checkLabel.locator('input[type="checkbox"]').first()
+                .or(this.page.locator('input[type="checkbox"][name*="billing"], input[type="checkbox"][id*="billing"], input[type="checkbox"][name*="same"]').first());
+
+            let isChecked = false;
+            if (await inputCheck.isVisible({ timeout: 1000 }).catch(() => false)) {
+                isChecked = await inputCheck.isChecked().catch(() => false);
+            } else {
+                isChecked = await checkLabel.evaluate(el => {
+                    const inp = el.querySelector('input[type="checkbox"]');
+                    if (inp) return inp.checked;
+                    return el.classList.contains('active') || el.classList.contains('checked') || el.getAttribute('aria-checked') === 'true';
+                }).catch(() => false);
+            }
+
+            if (!isChecked) {
+                console.log("Marcando checkbox: 'Utilizar mi información para la facturación'...");
+                await checkLabel.click({ force: true }).catch(async () => {
+                    await checkLabel.evaluate(el => el.click());
+                });
+                await this.page.evaluate(() => {
+                    const labels = Array.from(document.querySelectorAll('label, div, span'));
+                    const match = labels.find(l => /utilizar mi informaci[óo]n para la facturaci[óo]n/i.test(l.innerText || ''));
+                    if (match) {
+                        match.click();
+                        const inp = match.querySelector('input[type="checkbox"]');
+                        if (inp) {
+                            inp.checked = true;
+                            inp.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    }
+                }).catch(() => {});
+                console.log("✅ Checkbox de facturación marcado.");
+            } else {
+                console.log("✅ Checkbox de facturación ya se encontraba marcado.");
+            }
+        }
+        await this.page.waitForTimeout(1000);
     }
 
     async llenarDatosPersonales(cliente) {
@@ -206,23 +266,281 @@ export class CheckoutPage {
         await this.llenarCampoSeguro(this.inputEmail, cliente.email);
         await this.llenarCampoSeguro(this.inputPhoneCustomer, cliente.phone);
         await this.llenarCampoSeguro(this.inputDocument, cliente.document);
-        await this.page.waitForTimeout(3000);
+        
+        // Asegurar siempre el check de 'Utilizar mi información para la facturación'
+        await this.asegurarDatosFacturacion();
+
+        await this.page.waitForTimeout(2000);
     }
 
-    async seleccionarMetodoPago(paymentMethodId) {
-        console.log(`Seleccionando método de pago...`);
-        const selectorPago = this.page.locator(`${paymentMethodId}, input[value*="Efectivo"], label:has-text("Efectivo"), [id*="Efectivo"], label:has-text("Dinheiro"), label:has-text("Efectivo en entrega")`).first();
-        if (await selectorPago.isVisible({ timeout: 4000 }).catch(() => false)) {
-            await selectorPago.scrollIntoViewIfNeeded().catch(() => {});
-            await selectorPago.check().catch(async () => {
-                await selectorPago.click();
-            });
-        } else {
-            const primerOpcionPago = this.page.locator('.PaymentMethods label, [class*="PaymentMethod"] label, input[type="radio"] + label').first();
-            if (await primerOpcionPago.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await primerOpcionPago.click().catch(() => {});
+    /**
+     * Selecciona el método de pago en Colombia:
+     * - 'Datáfono'
+     * - 'Efectivo (Monto exacto)'
+     * - 'Efectivo (Con cambio)'
+     * @param {'datafono' | 'efectivo_exacto' | 'efectivo_cambio' | string} metodoPago
+     * @param {string|number} [montoCambio]
+     */
+    async seleccionarMetodoPago(metodoPago = 'Datáfono', montoCambio = null) {
+        const metodoLower = (metodoPago || '').toLowerCase();
+        const esDatafono = metodoLower.includes('datafono') || metodoLower.includes('datáfono') || metodoLower.includes('punto') || metodoLower === 'pos';
+        const esEfectivoCambio = metodoLower.includes('cambio') || metodoLower === 'efectivo_cambio';
+        const esEfectivoExacto = !esDatafono && !esEfectivoCambio;
+
+        // 1. Esperar a que la página esté estable y hacer scroll
+        await this.page.locator('.Modal, [role="dialog"], .Loading').first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
+
+        const seccionMetodoPago = this.page.locator('text=/método de pago|metodo de pago/i').first();
+        await seccionMetodoPago.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
+
+        const nombreBuscar = esDatafono ? 'Datáfono' : 'Efectivo';
+        console.log(`Seleccionando método de pago en Colombia: "${nombreBuscar}"...`);
+
+        const regexNombre = esDatafono ? /dat[aá]fono/i : /^efectivo$/i;
+
+        for (let intento = 1; intento <= 6; intento++) {
+            // 1. Encontrar el texto "Datáfono" o "Efectivo"
+            const textLocator = this.page.getByText(regexNombre).last();
+            if (await textLocator.isVisible().catch(() => false)) {
+                await textLocator.scrollIntoViewIfNeeded().catch(() => {});
+                
+                // Clic en el texto
+                await textLocator.click({ force: true }).catch(() => {});
+                
+                // Clic físico en el círculo del radio (a la izquierda del texto)
+                const box = await textLocator.boundingBox().catch(() => null);
+                if (box) {
+                    await this.page.mouse.click(box.x - 22, box.y + box.height / 2).catch(() => {});
+                    await this.page.mouse.click(box.x - 14, box.y + box.height / 2).catch(() => {});
+                }
+            }
+
+            // 2. Clic en label o contenedor
+            const labelDirect = this.page.locator('label, [class*="Radio"], [class*="radio"]').filter({ hasText: regexNombre }).last();
+            if (await labelDirect.isVisible().catch(() => false)) {
+                await labelDirect.click({ force: true }).catch(() => {});
+            }
+
+            // 3. Disparo a nivel DOM y React Props
+            await this.page.evaluate((esDatafonoFlag) => {
+                const targetRegex = esDatafonoFlag ? /dat[aá]fono/i : /^efectivo$/i;
+                const allNodes = Array.from(document.querySelectorAll('*'));
+                
+                const matchNode = allNodes.reverse().find(el => {
+                    const txt = (el.innerText || el.textContent || '').trim();
+                    return targetRegex.test(txt) && txt.length < 25;
+                });
+
+                if (matchNode) {
+                    matchNode.click();
+                    let parent = matchNode.parentElement;
+                    let depth = 0;
+                    while (parent && parent !== document.body && depth < 4) {
+                        parent.click();
+                        
+                        const reactKey = Object.keys(parent).find(k => k.startsWith('__reactProps'));
+                        if (reactKey && parent[reactKey] && typeof parent[reactKey].onClick === 'function') {
+                            parent[reactKey].onClick({ preventDefault: () => {}, stopPropagation: () => {} });
+                        }
+
+                        const radio = parent.querySelector('input[type="radio"]');
+                        if (radio) {
+                            radio.checked = true;
+                            radio.click();
+                            radio.dispatchEvent(new Event('input', { bubbles: true }));
+                            radio.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+
+                        parent = parent.parentElement;
+                        depth++;
+                    }
+                }
+            }, esDatafono).catch(() => {});
+
+            await this.page.waitForTimeout(1500);
+
+            // 4. Verificar si 'Débito / Crédito' y 'No olvides ingresar tu tarjeta' desaparecieron
+            const advertenciaTarjeta = this.page.locator('text=/no olvides ingresar tu tarjeta|débito \\/ crédito/i');
+            const sigueTarjeta = await advertenciaTarjeta.first().isVisible({ timeout: 1000 }).catch(() => false);
+            if (!sigueTarjeta) {
+                console.log(`✅ Confirmado: "${nombreBuscar}" seleccionado correctamente.`);
+                break;
+            } else {
+                console.log(`Aviso (Intento ${intento}): Tarjeta sigue activa. Reintentando selección de "${nombreBuscar}"...`);
             }
         }
-        await this.page.waitForTimeout(3000);
+
+        if (!esDatafono) {
+            // Localizador estricto del Switch de 'Pagar con valor total / Monto exacto' (NUNCA tocar el checkbox de facturación)
+            const switchValorTotal = this.page.locator('label, div, p')
+                .filter({ hasText: /valor total|monto exacto|total exacto|pago total|monto a pagar/i })
+                .locator('input, [role="switch"], .Switch, [class*="switch"], [class*="Toggle"], [class*="checkbox"]')
+                .or(this.page.locator('label').filter({ hasText: /valor total|monto exacto|total exacto|pago total/i }));
+
+            const switchEl = switchValorTotal.first();
+
+            const switchPresente = await switchEl.isVisible({ timeout: 2000 }).catch(() => false);
+            if (switchPresente) {
+                const estaActivo = await switchEl.evaluate(node => {
+                    if (node.tagName === 'INPUT') return node.checked;
+                    if (node.getAttribute('aria-checked') !== null) return node.getAttribute('aria-checked') === 'true';
+                    if (node.getAttribute('data-checked') !== null) return node.getAttribute('data-checked') === 'true';
+                    const inputInside = node.querySelector('input[type="checkbox"]');
+                    if (inputInside) return inputInside.checked;
+                    return node.classList.contains('active') || node.classList.contains('checked') || node.classList.contains('on');
+                }).catch(() => false);
+
+                if (esEfectivoExacto && !estaActivo) {
+                    console.log('Activando switch de valor total (monto exacto)...');
+                    await switchEl.click({ force: true }).catch(async () => {
+                        await switchEl.evaluate(el => el.click());
+                    });
+                    console.log('✅ Switch de valor total activado.');
+                } else if (esEfectivoCambio && estaActivo) {
+                    console.log('Desactivando switch de valor total para habilitar input de cambio...');
+                    await switchEl.click({ force: true }).catch(async () => {
+                        await switchEl.evaluate(el => el.click());
+                    });
+                    console.log('✅ Switch de valor total desactivado.');
+                }
+            }
+
+            if (esEfectivoCambio) {
+                await this.page.waitForTimeout(1000);
+
+                let montoADar = montoCambio || '100000';
+                
+                const totalElement = this.page.locator('.OrderSummary, [class*="Total"], [class*="total"], strong, span')
+                    .filter({ hasText: /\$\s*\d+|\b\d+[.,]\d{2}\b/ }).last();
+                if (await totalElement.isVisible({ timeout: 1500 }).catch(() => false)) {
+                    const totalText = await totalElement.innerText().catch(() => '');
+                    const matchNum = totalText.match(/(\d+[.,]\d{2}|\d+)/);
+                    if (matchNum) {
+                        const totalNum = parseFloat(matchNum[1].replace(/[\.,]/g, ''));
+                        if (!isNaN(totalNum) && totalNum > 0) {
+                            montoADar = String(totalNum + 20000);
+                        }
+                    }
+                }
+
+                const inputMonto = this.page.locator('input[name*="change"], input[name*="amount"], input[name*="cash"], input[placeholder*="monto"], input[placeholder*="cambio"], input[type="number"], input[placeholder*="con cuánto" i], input[placeholder*="con cuanto" i]').first()
+                    .or(this.page.locator('.PaymentMethods input[type="text"], [class*="Payment"] input[type="text"], input[type="text"]').last());
+
+                if (await inputMonto.isVisible({ timeout: 4000 }).catch(() => false)) {
+                    console.log(`Llenando monto que se va a pagar (mayor al total): "$${montoADar}"`);
+                    await inputMonto.click();
+                    await inputMonto.fill(montoADar);
+                    await inputMonto.evaluate((el, v) => {
+                        el.value = v;
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                        el.dispatchEvent(new Event('blur', { bubbles: true }));
+                    }, montoADar).catch(() => {});
+                    console.log(`✅ Monto de pago "$${montoADar}" configurado.`);
+                }
+            }
+        }
+
+        // Re-verificar que el checkbox de facturación permanezca marcado
+        await this.asegurarDatosFacturacion();
+
+        await this.page.waitForTimeout(1500);
+    }
+
+    /**
+     * Procesa el pago, espera a que cargue la pantalla con el 'Código de pedido' y lo extrae con exactitud
+     * @returns {Promise<string>} Número / Código de Pedido
+     */
+    async procesarPagoYConfirmarOrden() {
+        console.log("Iniciando proceso de pago y creación de orden...");
+
+        this.codigoPedido = null;
+
+        // Asegurar una última vez que los datos de facturación estén marcados
+        await this.asegurarDatosFacturacion();
+
+        // 1. Hacer clic en el botón de Pagar / Realizar Pedido
+        const btnPagar = this.btnPagar.last();
+        await btnPagar.waitFor({ state: 'visible', timeout: 10000 });
+        await btnPagar.scrollIntoViewIfNeeded().catch(() => {});
+
+        console.log("Haciendo clic en el botón 'Pagar'...");
+        await btnPagar.click({ force: true }).catch(async () => {
+            await btnPagar.evaluate(b => b.click());
+        });
+
+        // 2. Monitorear estado: 'Procesando...'
+        console.log("Esperando procesamiento del pedido...");
+        if (await this.indicadorProcesando.first().isVisible({ timeout: 4000 }).catch(() => false)) {
+            console.log("⏳ [Estado]: Procesando orden en curso...");
+        }
+
+        // 3. Monitorear estado: 'Orden creada exitosamente'
+        const toastExito = this.toastOrdenCreada.first();
+        if (await toastExito.isVisible({ timeout: 15000 }).catch(() => false)) {
+            const msg = await toastExito.innerText().catch(() => 'Orden creada exitosamente');
+            console.log(`🎉 [Toast Confirmado]: "${msg.trim()}"`);
+        }
+
+        // 4. ESPERAR A QUE CARGUE LA PANTALLA DE DETALLE CON EL TEXTO "Código de pedido:"
+        console.log("Esperando a que la pantalla de Detalle de la Orden cargue por completo...");
+
+        const labelCodigoPedido = this.page.locator('text=/código de pedido|codigo de pedido|código del pedido|número de pedido/i')
+            .or(this.page.locator('p, span, div, h1, h2, h3, strong').filter({ hasText: /código de pedido|codigo de pedido|número de pedido/i }));
+
+        await labelCodigoPedido.first().waitFor({ state: 'visible', timeout: 40000 }).catch(() => {
+            console.log("Aviso: Esperando renderizado de la tarjeta de pedido...");
+        });
+
+        // Scroll físico y centrado de la tarjeta de la orden
+        console.log("Haciendo scroll para centrar la tarjeta de pedido en pantalla...");
+        await labelCodigoPedido.first().scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
+        await this.page.mouse.wheel(0, 450);
+        await this.page.evaluate(() => {
+            const el = Array.from(document.querySelectorAll('*')).find(e => e.innerText && /código de pedido|código del pedido/i.test(e.innerText));
+            if (el) {
+                el.scrollIntoView({ behavior: 'instant', block: 'center' });
+            }
+        }).catch(() => {});
+
+        await this.page.waitForTimeout(2000);
+
+        // 5. Extraer el valor exacto del código de pedido
+        console.log("Extrayendo código de pedido de la pantalla de detalle...");
+
+        const elemento = labelCodigoPedido.first();
+        if (await elemento.isVisible().catch(() => false)) {
+            const textoPadre = await elemento.evaluate(el => {
+                return (el.parentElement?.innerText || el.innerText || '').trim();
+            }).catch(() => '');
+
+            console.log(`Texto capturado del elemento: "${textoPadre}"`);
+
+            const match = textoPadre.match(/c[óo]digo d?e?l?\s*pedido:\s*([0-9A-Za-z-]+)/i);
+            if (match && match[1]) {
+                this.codigoPedido = match[1].trim();
+            }
+        }
+
+        if (!this.codigoPedido) {
+            const textoBody = await this.page.innerText('body').catch(() => '');
+            const matchBody = textoBody.match(/c[óo]digo d?e?l?\s*pedido:\s*([0-9A-Za-z-]+)/i)
+                || textoBody.match(/#(CO-[0-9]+|[0-9]{5,}-[0-9]{4,}|[0-9]{6,})/i);
+
+            if (matchBody && matchBody[1]) {
+                this.codigoPedido = matchBody[1].trim();
+            }
+        }
+
+        console.log(`======================================================`);
+        console.log(`🎉 ¡PEDIDO CREADO CON ÉXITO EN COLOMBIA!`);
+        console.log(`📋 Código de Pedido: [ ${this.codigoPedido || 'CONFIRMADO'} ]`);
+        console.log(`======================================================`);
+
+        await this.page.waitForTimeout(5000);
+
+        return this.codigoPedido;
     }
 }

@@ -6,13 +6,23 @@ import { CartPage } from '../pages/CartPage.js';
 import { CheckoutPage } from '../pages/CheckoutPage.js';
 import { ejecutarPaso } from '../../../utils/pasos.js';
 
-test('Flujo E2E - Compra a domicilio usuario anónimo (Ecuador)', async ({ page }, testInfo) => {
+/**
+ * Función base que ejecuta el flujo completo de Delivery en Ecuador con el método de pago especificado
+ * @param {import('@playwright/test').Page} page
+ * @param {import('@playwright/test').TestInfo} testInfo
+ * @param {'Punto de Venta' | 'Efectivo (Monto Exacto)' | 'Efectivo (Con Cambio)'} metodoPago
+ */
+async function ejecutarFlujoDeliveryEcuador(page, testInfo, metodoPago) {
+    test.setTimeout(180000);
+
     const homePage = new HomePage(page);
     const menuPage = new MenuPage(page);
     const cartPage = new CartPage(page);
     const checkoutPage = new CheckoutPage(page);
 
-    // Paso 1: Navegación y Configuración de Dirección Delivery
+    let codigoPedidoGenerado = null;
+
+    // Paso 1: Navegación y Ubicación
     await ejecutarPaso(page, testInfo, {
         numero: 1,
         titulo: 'Navegación y Configuración de Dirección Delivery',
@@ -47,19 +57,59 @@ test('Flujo E2E - Compra a domicilio usuario anónimo (Ecuador)', async ({ page 
         await cartPage.irAPagar();
     });
 
-    // Paso 4: Checkout y Confirmación de Datos
+    // Paso 4: Dirección de Entrega y Datos Personales
     await ejecutarPaso(page, testInfo, {
         numero: 4,
-        titulo: 'Dirección de Entrega, Datos Personales y Pago',
+        titulo: 'Dirección de Entrega y Datos del Cliente',
         descripcion: 'Detalle de dirección de entrega, datos del cliente y método de pago'
     }, async () => {
         await checkoutPage.iniciarCompletar();
         await checkoutPage.llenarDireccionEntrega(testData.deliveryAddress);
         await checkoutPage.llenarDatosPersonales(testData.customer);
-        await checkoutPage.seleccionarMetodoPago(testData.paymentMethodId);
     });
 
-    console.log("Flujo Ecuador Delivery finalizado con éxito.");
-    await page.waitForTimeout(5000);
+    // Paso 5: Selección de Método de Pago, Procesamiento y Generación de Orden
+    await ejecutarPaso(page, testInfo, {
+        numero: 5,
+        titulo: 'Método de Pago, Procesamiento y Detalle de la Orden',
+        descripcion: `Selección de '${metodoPago}', procesamiento de pago y captura de número de orden`
+    }, async () => {
+        await checkoutPage.seleccionarMetodoPago(metodoPago, testData.montoCambio);
+        codigoPedidoGenerado = await checkoutPage.procesarPagoYConfirmarOrden();
+
+        // Registrar metadatos en el informe ejecutivo
+        testInfo.annotations.push({
+            type: 'Método de Pago',
+            description: metodoPago
+        });
+
+        if (codigoPedidoGenerado) {
+            testInfo.annotations.push({
+                type: 'Código de Pedido',
+                description: codigoPedidoGenerado
+            });
+            await testInfo.attach('📋 Código de Pedido Confirmado', {
+                body: `Código de Pedido: ${codigoPedidoGenerado}\nMétodo de Pago: ${metodoPago}`,
+                contentType: 'text/plain'
+            });
+        }
+    });
+
+    console.log(`✅ Flujo Ecuador Delivery (${metodoPago}) finalizado exitosamente. Orden: [ ${codigoPedidoGenerado} ]`);
+}
+
+// =========================================================================
+// 🇪🇨 Casos de Prueba E2E - Métodos de Pago Ecuador
+// =========================================================================
+
+test('Flujo E2E - Compra Delivery con Punto de Venta (Ecuador)', async ({ page }, testInfo) => {
+    await ejecutarFlujoDeliveryEcuador(page, testInfo, testData.paymentMethods.puntoDeVenta);
 });
 
+test('Flujo E2E - Compra Delivery con Efectivo (Monto Exacto) (Ecuador)', async ({ page }, testInfo) => {
+    await ejecutarFlujoDeliveryEcuador(page, testInfo, testData.paymentMethods.efectivoExacto);
+});
+
+test('Flujo E2E - Compra Delivery con Efectivo (Con Cambio) (Ecuador)', async ({ page }, testInfo) => {
+    await ejecutarFlujoDeliveryEcuador(page, testInfo, testData.paymentMethods.efectivoCambio);
+});

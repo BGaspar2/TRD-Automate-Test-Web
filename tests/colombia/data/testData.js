@@ -22,7 +22,12 @@ export const testData = {
         phone: "3001234567",
         document: "1012345678"
     },
-    paymentMethodId: "#Efectivo",
+    paymentMethods: {
+        datafono: "Datáfono",
+        efectivoExacto: "Efectivo (Monto Exacto)",
+        efectivoCambio: "Efectivo (Con Cambio)"
+    },
+    montoCambio: "100000",
     registration: {
         baseEmail: process.env.TEST_EMAIL || "bryan.gaspar@trade.ec",
         timeoutOtpMs: 55000

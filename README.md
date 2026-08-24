@@ -1,52 +1,47 @@
 # TRD-Automate-Test-Web
 
-Automatización de pruebas E2E multi-país para los flujos de compra, tienda y checkout de **KFC LATAM** utilizando **Playwright Test Runner** y la arquitectura **Page Object Model (POM)**.
+Suite de automatización de pruebas de extremo a extremo (**E2E**) multi-país para los flujos de compra, tienda, registro y checkout de **KFC LATAM**, construida sobre **Playwright Test Runner** y bajo el patrón de arquitectura **Page Object Model (POM)**.
 
 ---
 
 ## 🌎 Cobertura Regional LATAM
 
-La suite automatiza el flujo completo de compra en usuario anónimo para **6 países** en los canales de **Delivery (A Domicilio)** y **Pickup (Retiro en Tienda)**:
+La suite automatiza los flujos clave de usuario anónimo y registrado para **6 países** en los canales de **Delivery (A Domicilio)** y **Pickup (Retiro en Tienda)**:
 
-| País | Carpeta | Canal Pickup (Búsqueda / Tienda) | Canal Delivery (Ubicación) | Documento ID / Registro | URL Base |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **🇦🇷 Argentina** | `tests/argentina/` | `alto palermo` / `CC KFC ALTO PALERMO` | `Av. Corrientes 1234` | DNI / Cédula (`30123456`) | `https://kfc-ar-env-develop-artisn.vercel.app/` |
-| **🇧🇷 Brasil** | `tests/brasil/` | `vila olimpa` / `KFC VILA OLIMPIA` | `Av. Paulista 1000` | CPF (`12345678901`) | `https://kfc-br-env-develop-artisn.vercel.app/` |
-| **🇨🇱 Chile** | `tests/chile/` | `guarida vieja` / `KFC GUARDIA VIEJA` | `Guardia Vieja 255` | RUT (`12345678-9`) | `https://kfc-cl-devops5-artisn.vercel.app/` |
-| **🇨🇴 Colombia** | `tests/colombia/` | `toberin` / `KFC TOBERIN` | `Toberin` | Cédula (`1012345678`) | `https://kfc-co-devops5-artisn.vercel.app/` |
-| **🇪🇨 Ecuador** | `tests/ecuador/` | `el inca` / `KFC EL INCA` | `Av. El Inca` | Cédula (`1712345678`) | `https://kfc-ec-devops5-artisn.vercel.app/` |
-| **🇻🇪 Venezuela** | `tests/venezuela/` | `sabana grande` / `KFC SABANA GRANDE` | `Sabana Grande` | Cédula (`V12345678`) | `https://kfc-ve-devops5-artisn.vercel.app/` |
-
----
-
-## 🚀 Características y Estrategia de Selección Resiliente
-
-- **Arquitectura Page Object Model (POM):** Separación modular de locators, datos de prueba y lógica por páginas (`HomePage`, `MenuPage`, `CartPage`, `CheckoutPage`).
-- **Paso a Paso de Negocio con Capturas Automáticas:** Integración mediante `ejecutarPaso(...)` que captura evidencia fotográfica en cada etapa del flujo (Ubicación, Selección de Producto, Carrito y Checkout).
-- **Ejecución Regional Resiliente:** La suite regional ejecuta todos los países de forma secuencial pero independiente; si un país falla, se registra la evidencia y continúa con los siguientes países sin detener la suite.
-- **Soporte Bicanal (Delivery & Pickup):** Pruebas ajustadas según las particularidades de cada modo (mapas, listados de tiendas, datos de envío o retiro directo).
-- **Selección Directa de Tienda en React:** Disparo de eventos nativos sintéticos (`__reactProps`) e interacción resiliente con los elementos de la tienda para activar los manipuladores globales (`moveCartHandler` / `selectStoreHandler`).
-- **Análisis Dinámico de Modificadores (Fracción X / Y):** Cálculo automático de opciones faltantes en grupos obligatorios (ej. `1 / 2` o `0 / 1`), agregando ítems dinámicamente hasta erradicar la alerta *"Debes escoger N opciones"*.
-- **Ajuste de Monto Mínimo de Carrito:** Validación automática del total del carrito contra el umbral mínimo del país, incrementando cantidades si no se alcanza el mínimo para ir a pagar.
-- **Preservación de Google Maps & Geocoding:** Conservación del texto completo de dirección para evitar rechazos en las sugerencias de la API de geolocalización.
-- **Formularios de Checkout Adaptativos:** Manejo inteligente de datos personales (Nombre, Apellido, Email, Celular con prefijos nacionales válidos como `9` en Argentina) y método de pago (Efectivo/Digital).
+| País | Carpeta | Canal Pickup (Búsqueda / Tienda) | Canal Delivery (Ubicación) | Métodos de Pago Automatizados | Documento ID | URL Base |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **🇨🇴 Colombia** | `tests/colombia/` | `toberin` / `KFC TOBERIN` | `Toberin, Bogotá` | • Datáfono<br>• Efectivo (Monto Exacto)<br>• Efectivo (Con Cambio) | Cédula (`1012345678`) | [kfc-co-devops5](https://kfc-co-devops5-artisn.vercel.app/) |
+| **🇪🇨 Ecuador** | `tests/ecuador/` | `el inca` / `KFC EL INCA` | `Av. El Inca, Quito` | • Punto de Venta<br>• Efectivo (Monto Exacto)<br>• Efectivo (Con Cambio) | Cédula (`1712345678`) | [kfc-ec-devops5](https://kfc-ec-devops5-artisn.vercel.app/) |
+| **🇻🇪 Venezuela** | `tests/venezuela/` | `sabana grande` / `KFC SABANA GRANDE` | `Sabana Grande, Caracas` | • Punto de Venta<br>• Efectivo (Monto Exacto)<br>• Efectivo (Con Cambio) | Cédula (`V12345678`) | [kfc-ve-devops5](https://kfc-ve-devops5-artisn.vercel.app/) |
+| **🇨🇱 Chile** | `tests/chile/` | `guarida vieja` / `KFC GUARDIA VIEJA` | `Guardia Vieja 255, Providencia` | • Efectivo / POS | RUT (`12345678-9`) | [kfc-cl-devops5](https://kfc-cl-devops5-artisn.vercel.app/) |
+| **🇦🇷 Argentina** | `tests/argentina/` | `alto palermo` / `CC KFC ALTO PALERMO` | `Av. Corrientes 1234, CABA` | • Efectivo / POS | DNI (`30123456`) | [kfc-ar-develop](https://kfc-ar-env-develop-artisn.vercel.app/) |
+| **🇧🇷 Brasil** | `tests/brasil/` | `vila olimpa` / `KFC VILA OLIMPIA` | `Av. Paulista 1000, SP` | • Dinheiro / Cartão | CPF (`12345678901`) | [kfc-br-develop](https://kfc-br-env-develop-artisn.vercel.app/) |
 
 ---
 
-## 📋 Requisitos Previos
+## 💳 Flujo E2E de Pago y Confirmación de Órdenes
 
-- **Node.js** (v18 o superior recomendado)
-- **Google Chrome** instalado
+La suite implementa un flujo integral de creación de orden y confirmación de pago para compras a domicilio:
+
+1. **Selección Multi-Método de Pago:**
+   - **Punto de Venta / Datáfono:** Selección resiliente mediante cálculo de coordenadas físicas sobre el radio button y disparadores de estado React (`__reactProps`).
+   - **Efectivo (Monto Exacto):** Activación del switch *"Pagar con valor total"* para enviar la orden con el monto exacto del carrito.
+   - **Efectivo (Con Cambio):** Desactivación automática del switch de valor total e ingreso dinámico de un monto mayor al total de la compra (ej. `$50.00` en Ecuador, `$100.000` en Colombia).
+2. **Aseguramiento de Facturación:**
+   - Verificación y marcado garantizado de la casilla *"Utilizar mi información para la facturación"*, previniendo bloqueos por formularios fiscales incompletos.
+3. **Captura y Extracción del Código de Pedido:**
+   - **Intercepción de Red (API Monitoring):** Escucha y captura de payloads de respuesta de endpoints de checkout (`/order`, `/checkout`, `/orders`).
+   - **Inspección del DOM:** Extracción de códigos con patrones oficiales (ej. `0000011546-010101`).
+4. **Scroll y Evidencia Fotográfica Centrada:**
+   - Desplazamiento físico suave (`mouse.wheel`) y alineación visual centrada de la tarjeta de pedido (restaurante, datos de entrega, total y código) para las evidencias del reporte.
 
 ---
 
-## 🛠️ Instalación
+## 🔐 Flujo de Registro de Usuario y Validación OTP
 
-1. Clona el repositorio e instala las dependencias:
-   ```bash
-   npm install
-   npx playwright install
-   ```
+- Generación dinámica de cuentas de correo temporales vía API (`GuerrillaMail` / `1secmail`).
+- Llenado automático de formulario de registro de usuario nuevo con prefijos telefónicos nacionales válidos.
+- Consulta en tiempo real a la bandeja de entrada, extracción del **código OTP de 6 dígitos** e ingreso automatizado en la pantalla de verificación.
 
 ---
 
@@ -55,149 +50,165 @@ La suite automatiza el flujo completo de compra en usuario anónimo para **6 pa�
 ```text
 TRD-Automate-Test-Web/
 ├── tests/
-│   ├── flujoRegionalAnonimo.js   # SUITE MÁSTER REGIONAL (Ejecución LATAM independiente)
-│   ├── argentina/
-│   │   ├── data/testData.js
-│   │   ├── pages/ (HomePage, MenuPage, CartPage, CheckoutPage)
-│   │   └── pickup/flujoAnonimoPickup.js
-│   ├── brasil/
-│   │   ├── data/testData.js
-│   │   ├── pages/ (HomePage, MenuPage, CartPage, CheckoutPage)
-│   │   └── pickup/flujoAnonimoPickup.js
-│   ├── chile/
-│   │   ├── data/testData.js
-│   │   ├── pages/ (HomePage, MenuPage, CartPage, CheckoutPage)
-│   │   ├── delivery/flujoAnonimoDel.js
-│   │   └── pickup/flujoAnonimoPickup.js
+│   ├── flujoRegionalAnonimo.js       # Suite máster regional E2E (Ejecución LATAM independiente)
+│   ├── flujoRegistroOtp.js           # Suite máster regional de registro OTP
 │   ├── colombia/
-│   │   ├── data/testData.js
-│   │   ├── pages/ (HomePage, MenuPage, CartPage, CheckoutPage)
-│   │   ├── delivery/flujoAnonimoDel.js
-│   │   └── pickup/flujoAnonimoPickup.js
+│   │   ├── data/testData.js          # Direcciones, métodos de pago y cliente CO
+│   │   ├── pages/                    # HomePage, MenuPage, CartPage, CheckoutPage CO
+│   │   ├── delivery/flujoAnonimoDel.js # 3 pruebas independientes (Datáfono, Efectivo Exacto, Efectivo Cambio)
+│   │   ├── pickup/flujoAnonimoPickup.js
+│   │   └── auth/flujoRegistroOtp.js
 │   ├── ecuador/
-│   │   ├── data/testData.js
-│   │   ├── pages/ (HomePage, MenuPage, CartPage, CheckoutPage)
-│   │   ├── delivery/flujoAnonimoDel.js
-│   │   └── pickup/flujoAnonimoPickup.js
+│   │   ├── data/testData.js          # Direcciones, métodos de pago y cliente EC
+│   │   ├── pages/                    # HomePage, MenuPage, CartPage, CheckoutPage EC
+│   │   ├── delivery/flujoAnonimoDel.js # 3 pruebas independientes (POS, Efectivo Exacto, Efectivo Cambio)
+│   │   ├── pickup/flujoAnonimoPickup.js
+│   │   └── auth/flujoRegistroOtp.js
 │   ├── venezuela/
-│   │   ├── data/testData.js
-│   │   ├── pages/ (HomePage, MenuPage, CartPage, CheckoutPage)
-│   │   ├── delivery/flujoAnonimoDel.js
-│   │   └── pickup/flujoAnonimoPickup.js
-│   ├── auth.js                   # Autenticación persistente
-│   └── flujoRegistradoDel.js     # Flujo E2E usuario registrado
+│   │   ├── data/testData.js          # Direcciones, métodos de pago y cliente VE
+│   │   ├── pages/                    # HomePage, MenuPage, CartPage, CheckoutPage VE
+│   │   ├── delivery/flujoAnonimoDel.js # 3 pruebas independientes (POS, Efectivo Exacto, Efectivo Cambio)
+│   │   ├── pickup/flujoAnonimoPickup.js
+│   │   └── auth/flujoRegistroOtp.js
+│   ├── chile/                        # Tests y páginas Chile
+│   ├── argentina/                    # Tests y páginas Argentina
+│   └── brasil/                       # Tests y páginas Brasil
 ├── utils/
-│   ├── pasos.js                  # Helper de pasos de negocio y capturas de pantalla
-│   ├── abrirReporte.js           # Script para abrir informe ejecutivo en el navegador
+│   ├── pasos.js                      # Helper de pasos de negocio y capturas de pantalla
+│   ├── abrirReporte.js               # Script para abrir informe ejecutivo en el navegador
+│   ├── tempEmailService.js           # Servicio de generación de correos y lectura de OTP
 │   └── reporters/
-│       └── spanish-executive-reporter.js # Custom Reporter oficial en Español
-├── playwright.config.ts          # Configuración del Runner de Playwright
+│       └── spanish-executive-reporter.js # Reporter oficial ejecutivo en Español
+├── playwright.config.ts              # Configuración global de Playwright
 ├── package.json
 └── README.md
 ```
 
 ---
 
+## 🛠️ Instalación y Configuración
+
+1. **Clonar el repositorio e instalar dependencias:**
+   ```bash
+   git clone https://github.com/BGaspar2/TRD-Automate-Test-Web.git
+   cd aut-test
+   npm install
+   npx playwright install
+   ```
+
+---
+
 ## ⚙️ Ejecución de Pruebas
 
-### 1. Ejecutar Suite Regional LATAM (Todos los Países)
+### 1. 🇨🇴 Colombia (Delivery & Pickup)
 
-- **Modo Visible (Headed):**
-  ```bash
-  npm run test:regional
-  ```
+```bash
+# Suite completa de Delivery (Datáfono, Efectivo Exacto, Efectivo Cambio):
+npm run test:colombia
 
-- **Modo Headless (Sin Interfaz):**
-  ```bash
-  npm run test:regional:headless
-  ```
+# Pruebas individuales por método de pago:
+npm run test:colombia:datafono
+npm run test:colombia:efectivo:exacto
+npm run test:colombia:efectivo:cambio
 
----
-
-### 2. Ejecutar Pruebas por País y Canal
-
-#### 🇦🇷 Argentina
-- **Pickup:**
-  ```bash
-  npm run test:argentina:pickup
-  ```
-
-#### 🇧🇷 Brasil
-- **Pickup:**
-  ```bash
-  npm run test:brasil:pickup
-  ```
-
-#### 🇨🇱 Chile
-- **Delivery:**
-  ```bash
-  npm run test:chile
-  ```
-- **Pickup:**
-  ```bash
-  npm run test:chile:pickup
-  ```
-
-#### 🇨🇴 Colombia
-- **Delivery:**
-  ```bash
-  npm run test:colombia
-  ```
-- **Pickup:**
-  ```bash
-  npm run test:colombia:pickup
-  ```
-
-#### 🇪🇨 Ecuador
-- **Delivery:**
-  ```bash
-  npm run test:ecuador
-  ```
-- **Pickup:**
-  ```bash
-  npm run test:ecuador:pickup
-  ```
-
-#### 🇻🇪 Venezuela
-- **Delivery:**
-  ```bash
-  npm run test:venezuela
-  ```
-- **Pickup:**
-  ```bash
-  npm run test:venezuela:pickup
-  ```
+# Retiro en tienda (Pickup) y Registro OTP:
+npm run test:colombia:pickup
+npm run test:colombia:registro
+```
 
 ---
 
-## 📊 Informes de Pruebas (Reportes en Español y Paso a Paso)
+### 2. 🇪🇨 Ecuador (Delivery & Pickup)
 
-El proyecto cuenta con un sistema de reportes enriquecido diseñado tanto para **equipos técnicos (QA/Desarrollo)** como para **perfiles de negocio y no técnicos (Product Managers, Stakeholders, Gerencia)**.
+```bash
+# Suite completa de Delivery (Punto de Venta, Efectivo Exacto, Efectivo Cambio):
+npm run test:ecuador
 
-### 🌟 1. Informe Ejecutivo en Español (Recomendado para Negocio y QA)
+# Pruebas individuales por método de pago:
+npm run test:ecuador:pos
+npm run test:ecuador:efectivo:exacto
+npm run test:ecuador:efectivo:cambio
 
-Genera un dashboard visual, moderno y 100% en español que incluye:
-- **Resumen Ejecutivo (KPIs):** Tasa de éxito global (%), pruebas aprobadas, fallidas, omitidas y duración total.
-- **Matriz de Cobertura Regional con Banderas Oficiales SVG:** Indicadores de salud en tiempo real por país (🇦🇷 AR, 🇧🇷 BR, 🇨🇱 CL, 🇨🇴 CO, 🇪🇨 EC, 🇻🇪 VE) y por canal (🛵 Delivery, 🛍️ Pickup).
-- **Paso a Paso Visual con Capturas (Screenshots):** Cada prueba muestra la cronología de pasos de negocio con su duración, estado y **fotografía de evidencia** en alta resolución.
-- **Visor Lightbox Integrado:** Haz clic en cualquier captura para verla en pantalla completa, hacer zoom y navegar con flechas paso a paso como una galería secuencial.
-- **Reproductor de Video Embebido:** Visualiza el video completo de la navegación directamente en el informe sin necesidad de abrir archivos locales.
-- **Explicación Amigable de Errores:** En caso de fallos, explica el motivo en lenguaje natural claro (ej: local cerrado, lentitud de red), manteniendo una sección técnica colapsable para desarrolladores.
-- **Filtros Dinámicos y Búsqueda:** Filtra por país, canal, resultado y busca por texto al instante.
-- **Exportación a PDF / Imprimir:** Botón optimizado para generar minutas o reportes ejecutivos listos para compartir.
+# Retiro en tienda (Pickup) y Registro OTP:
+npm run test:ecuador:pickup
+npm run test:ecuador:registro
+```
 
-Para abrir el **Informe Ejecutivo** tras ejecutar tus pruebas:
+---
+
+### 3. 🇻🇪 Venezuela (Delivery & Pickup)
+
+```bash
+# Suite completa de Delivery (Punto de Venta, Efectivo Exacto, Efectivo Cambio):
+npm run test:venezuela
+
+# Pruebas individuales por método de pago:
+npm run test:venezuela:pos
+npm run test:venezuela:efectivo:exacto
+npm run test:venezuela:efectivo:cambio
+
+# Retiro en tienda (Pickup) y Registro OTP:
+npm run test:venezuela:pickup
+npm run test:venezuela:registro
+```
+
+---
+
+### 4. 🇨🇱 Chile, 🇦🇷 Argentina y 🇧🇷 Brasil
+
+```bash
+# Chile
+npm run test:chile
+npm run test:chile:pickup
+npm run test:chile:registro
+
+# Argentina
+npm run test:argentina:pickup
+npm run test:argentina:registro
+
+# Brasil
+npm run test:brasil:pickup
+npm run test:brasil:registro
+```
+
+---
+
+### 5. 🌐 Suites Regionales LATAM (Multi-País)
+
+```bash
+# Compras Anónimas en toda la región (Modo Visible / Headless):
+npm run test:regional
+npm run test:regional:headless
+
+# Registro OTP en toda la región:
+npm run test:regional:registro
+npm run test:regional:registro:headless
+```
+
+---
+
+## 📊 Informes y Reportes de Resultados
+
+### 🌟 1. Informe Ejecutivo Oficial en Español
+
+Genera un dashboard visual con enfoque directivo y de calidad:
+- **Resumen de KPIs:** Tasa de éxito global (%), pruebas aprobadas, fallidas, omitidas y tiempos.
+- **Códigos de Orden y Métodos de Pago:** Indicador visual `💳 [Método de Pago]` y banner `🧾 Orden: [Código de Pedido]` por cada caso.
+- **Paso a Paso con Capturas de Pantalla:** Registro fotográfico cronológico en alta resolución con lightbox integrado.
+- **Reproductor de Video Embebido:** Reproducción de la grabación de la sesión sin descargar archivos.
+- **Exportación a PDF / Imprimir:** Generación directa de reportes compartibles.
+
+Para abrir el **Informe Ejecutivo**:
 ```bash
 npm run report:ejecutivo
 ```
-*(O abre directamente el archivo `playwright-report/informe-ejecutivo.html` en cualquier navegador).*
+*(O abrir directamente `playwright-report/informe-ejecutivo.html` en el navegador).*
 
 ---
 
-### 🔧 2. Informe Técnico Nativo de Playwright
+### 🔧 2. Informe Técnico de Playwright
 
-Para inspeccionar trazas profundas, árbol de red y detalles de bajo nivel:
+Para depuración profunda de selectores, consola de red y trazas:
 ```bash
 npm run report:tecnico
 ```
-*(O mediante `npx playwright show-report playwright-report/tecnico`).*
