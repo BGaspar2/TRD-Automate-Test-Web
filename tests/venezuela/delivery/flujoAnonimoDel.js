@@ -6,11 +6,15 @@ import { CartPage } from '../pages/CartPage.js';
 import { CheckoutPage } from '../pages/CheckoutPage.js';
 import { ejecutarPaso } from '../../../utils/pasos.js';
 
-test('Flujo E2E - Compra a domicilio usuario anónimo (Venezuela)', async ({ page }, testInfo) => {
+test('Flujo E2E - Compra a domicilio con Pago y Generación de Orden (Venezuela)', async ({ page }, testInfo) => {
+    test.setTimeout(120000);
+
     const homePage = new HomePage(page);
     const menuPage = new MenuPage(page);
     const cartPage = new CartPage(page);
     const checkoutPage = new CheckoutPage(page);
+
+    let codigoPedidoGenerado = null;
 
     // Paso 1: Navegación y Ubicación
     await ejecutarPaso(page, testInfo, {
@@ -40,25 +44,33 @@ test('Flujo E2E - Compra a domicilio usuario anónimo (Venezuela)', async ({ pag
     await ejecutarPaso(page, testInfo, {
         numero: 3,
         titulo: 'Revisión y Validación del Carrito de Compras',
-        descripcion: 'Verificación de montos mínimos/máximos y avance al pago'
+        descripcion: 'Verificación de montos mínimos/máximos y avance al checkout'
     }, async () => {
         await cartPage.procesarModalCarrito();
         await cartPage.validarYAjustarMontoCarrito();
         await cartPage.irAPagar();
     });
 
-    // Paso 4: Checkout y Confirmación de Datos
+    // Paso 4: Dirección de Entrega y Datos Personales
     await ejecutarPaso(page, testInfo, {
         numero: 4,
-        titulo: 'Dirección de Entrega, Datos Personales y Pago',
-        descripcion: 'Ingreso de dirección de entrega, datos del cliente y método de pago en Venezuela'
+        titulo: 'Dirección de Entrega y Datos del Cliente',
+        descripcion: 'Llenado de dirección de entrega detallada y datos personales del cliente'
     }, async () => {
         await checkoutPage.iniciarCompletar();
         await checkoutPage.llenarDireccionEntrega(testData.deliveryAddress);
         await checkoutPage.llenarDatosPersonales(testData.customer);
-        await checkoutPage.seleccionarMetodoPago(testData.paymentMethodId);
     });
 
-    console.log("Flujo Venezuela Delivery finalizado con éxito.");
-    await page.waitForTimeout(5000);
+    // Paso 5: Selección de Método de Pago, Procesamiento y Generación de Orden
+    await ejecutarPaso(page, testInfo, {
+        numero: 5,
+        titulo: 'Método de Pago, Procesamiento y Detalle de la Orden',
+        descripcion: `Selección de '${testData.paymentMethod}', procesamiento de pago, validación de éxito y captura de número de orden`
+    }, async () => {
+        await checkoutPage.seleccionarMetodoPago(testData.paymentMethod, testData.montoCambio);
+        codigoPedidoGenerado = await checkoutPage.procesarPagoYConfirmarOrden();
+    });
+
+    console.log(`✅ Flujo Venezuela Delivery finalizado exitosamente. Orden: [ ${codigoPedidoGenerado} ]`);
 });

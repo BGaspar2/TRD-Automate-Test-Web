@@ -18,11 +18,10 @@ export class HomePage {
         this.sinUbicacion = page.locator('.MissingLocationMessage, [class*="MissingLocation"], [class*="no-location"]');
         this.conUbicacion = page.locator('.DeliveryAddressMessage, [class*="DeliveryAddress"], [class*="address-message"]');
 
-        this.searchInput = page.locator('.Overlay input, .Modal input, [class*="modal"] input, [class*="Overlay"] input, [class*="SearchBar"] input')
-            .or(page.getByPlaceholder(/ingresa tu dirección|ingresa tu ubicación|buscar dirección|dirección|ubicación|address|endereço/i));
+        this.dialogUbicacion = page.locator('.Overlay, .Modal, [role="dialog"], [class*="Modal"], [class*="Overlay"]');
 
-        this.botonConfirmar = page.getByRole('button', { name: /confirmar|aceptar|confirmar endereço|avançar/i })
-            .or(page.locator('button.Button, button, [role="button"]').filter({ hasText: /confirmar|aceptar|confirmar endereço|avançar/i }));
+        this.botonConfirmar = page.getByRole('button', { name: /confirmar|aceptar|confirmar endereço|avançar|continuar/i })
+            .or(page.locator('button.Button, button, [role="button"]').filter({ hasText: /confirmar|aceptar|confirmar endereço|avançar|continuar/i }));
 
         this.botonMostrarMasTiendas = page.getByRole('button', { name: /mostrar más tiendas|ver más tiendas|mostrar más locales|ver más locales|mostrar mais lojas|ver mais lojas|mostrar mais restaurantes|ver mais restaurantes|mostrar más|ver más|mostrar mais|ver mais/i })
             .or(page.locator('button.Button, button, [role="button"], a').filter({ hasText: /mostrar más tiendas|ver más tiendas|mostrar más locales|ver más locales|mostrar mais lojas|ver mais lojas|mostrar mais restaurantes|ver mais restaurantes|mostrar más|ver más|mostrar mais|ver mais/i }));
@@ -51,9 +50,10 @@ export class HomePage {
     async seleccionarCanalDomicilio() {
         console.log("Seleccionando canal de compra: Domicilio...");
         const btn = this.botonDomicilio.first();
-        await btn.waitFor({ state: 'visible', timeout: 10000 });
-        await btn.click();
-        await this.page.waitForTimeout(5000);
+        if (await btn.isVisible({ timeout: 6000 }).catch(() => false)) {
+            await btn.click();
+            await this.page.waitForTimeout(3000);
+        }
     }
 
     async seleccionarCanalPickup(searchQuery = null, fullAddress = null) {
@@ -76,8 +76,8 @@ export class HomePage {
         console.log("Procesando selección de tienda en el modal de Pickup...");
 
         if (searchQuery) {
-            const inputBusquedaModal = this.page.getByPlaceholder(/buscar locales|locales cerca|buscar dirección|dirección|ubicación|address|endereço|pesquisar|buscar/i)
-                .or(this.page.locator('input[placeholder*="locales"], input[placeholder*="Locales"], input[placeholder*="dirección"], input[placeholder*="endereço"], input[type="search"], input[type="text"]')).first();
+            const modalPickup = this.dialogUbicacion.first();
+            const inputBusquedaModal = modalPickup.locator('input[type="text"], input[type="search"], input').first();
 
             if (await inputBusquedaModal.isVisible({ timeout: 5000 }).catch(() => false)) {
                 console.log(`Escribiendo en el buscador de Pickup: "${searchQuery}"...`);
@@ -102,7 +102,6 @@ export class HomePage {
             }
         }
 
-        // 1. Buscar si hay botón explícito de 'Seleccionar tienda' / 'Selecionar loja'
         const btnSeleccionar = this.botonSeleccionarTienda.first();
         if (await btnSeleccionar.isVisible({ timeout: 2000 }).catch(() => false)) {
             console.log("Haciendo clic en 'Seleccionar tienda' / 'Selecionar loja'...");
@@ -111,7 +110,6 @@ export class HomePage {
             return;
         }
 
-        // 2. Buscar si hay botón de 'Ver/Mostrar más tiendas'
         const btnMostrarMas = this.botonMostrarMasTiendas.first();
         if (await btnMostrarMas.isVisible({ timeout: 2000 }).catch(() => false)) {
             console.log("Haciendo clic en 'Ver/Mostrar más tiendas'...");
@@ -126,40 +124,24 @@ export class HomePage {
             }
         }
 
-        // 3. Localizar y hacer clic en la tarjeta de tienda (encadenando .or() antes de .first())
         console.log("Buscando la tarjeta de la tienda en el listado...");
-        
-        const locatorCadena = this.page.getByText(/CC KFC ALTO PALERMO|CC KFC MERLO|CC KFC RECOLETA|CC KFC GUEMES|CC KFC|VILA OLIMPA|GUARDIA VIEJA|TOBERIN|EL INCA/i)
+        const locatorCadena = this.page.getByText(/CC KFC ALTO PALERMO|CC KFC MERLO|CC KFC RECOLETA|CC KFC GUEMES|CC KFC|VILA OLIMPA|GUARDIA VIEJA|TOBERIN|EL INCA|SABANA GRANDE/i)
             .or(this.page.locator('div[class*="cursor-pointer"][class*="p-3"]'))
             .or(this.page.locator('div.flex.cursor-pointer.p-3'))
-            .or(this.page.locator('p').filter({ hasText: /CC KFC|ALTO PALERMO|VILA|GUARDIA|TOBERIN|EL INCA/i }));
+            .or(this.page.locator('p').filter({ hasText: /CC KFC|ALTO PALERMO|VILA|GUARDIA|TOBERIN|EL INCA|SABANA/i }));
 
         const opcionTienda = locatorCadena.first();
-
-        await opcionTienda.waitFor({ state: 'visible', timeout: 15000 }).catch(err => {
-            console.log("Timeout esperando tarjeta de tienda:", err.message);
-        });
+        await opcionTienda.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
 
         if (await opcionTienda.isVisible().catch(() => false)) {
             console.log("Haciendo clic en la tienda para confirmar selección...");
             await opcionTienda.scrollIntoViewIfNeeded().catch(() => {});
             
-            // Clic via Playwright + invocar onClick de React
             await opcionTienda.click({ force: true }).catch(async () => {
                 await opcionTienda.evaluate(el => el.click());
             });
-            await opcionTienda.evaluate(el => {
-                const card = el.closest('div[class*="cursor-pointer"]') || el;
-                card.click();
-                const reactKey = Object.keys(card).find(k => k.startsWith('__reactProps'));
-                if (reactKey && card[reactKey] && typeof card[reactKey].onClick === 'function') {
-                    card[reactKey].onClick({ preventDefault: () => {}, stopPropagation: () => {} });
-                }
-            }).catch(() => {});
-            
             await this.page.waitForTimeout(3000);
 
-            // Si aparece modal de confirmación de carrito
             const btnConfirmar = this.page.getByRole('button', { name: /aceptar|confirmar|cambiar|continuar|ir al menú|sim|sí/i }).first();
             if (await btnConfirmar.isVisible({ timeout: 1500 }).catch(() => false)) {
                 console.log("Confirmando modal de cambio de tienda...");
@@ -169,81 +151,91 @@ export class HomePage {
                 await this.page.waitForTimeout(2000);
             }
 
-            // Verificar si la URL ya cambió a /menu
             if (!this.page.url().includes('/menu')) {
-                console.log("Modal abierto tras selección. Forzando navegación directa al menú (/menu)...");
+                console.log("Navegando al menú (/menu)...");
                 const currentUrl = this.page.url();
                 const origin = new URL(currentUrl).origin;
                 await this.page.goto(`${origin}/menu`, { waitUntil: 'domcontentloaded' }).catch(() => {});
                 await this.page.waitForTimeout(3000);
             }
 
-            // Esperar a que las categorías del menú estén cargadas
             await this.page.waitForSelector('.CategoriesGrid, [class*="CategoriesGrid"], a figure', { timeout: 15000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
-        } else {
-            console.log("No se pudo seleccionar la tienda en la lista.");
         }
     }
 
     async configurarUbicacion(searchQuery, fullAddress) {
         console.log("Configurando ubicación para entrega a domicilio...");
 
-        // 1. Abrir siempre el modal de dirección haciendo clic en 'INGRESA TU UBICACIÓN' / Selector del navbar
-        const btnAbrirUbicacion = this.page.getByText(/ingresa tu ubicación|ingresa tu ubicacion|ingresar dirección|selecciona tu ubicación|seleccionar ubicación|endereço/i)
+        // 1. Abrir el modal de dirección haciendo clic en el selector de ubicación del header
+        const btnAbrirUbicacion = this.page.locator('header, nav, .Header, [class*="Header"]').locator('button, div, a, span')
+            .filter({ hasText: /ingresa tu ubicación|ingresa tu ubicacion|ingresar dirección|selecciona tu ubicación|seleccionar ubicación|endereço/i })
             .or(this.sinUbicacion)
-            .or(this.conUbicacion).first();
+            .or(this.conUbicacion)
+            .or(this.page.getByText(/ingresa tu ubicación|ingresa tu ubicacion/i));
 
-        if (await btnAbrirUbicacion.isVisible({ timeout: 5000 }).catch(() => false)) {
-            console.log("Haciendo clic en 'INGRESA TU UBICACIÓN' / Selector de ubicación del encabezado...");
-            await btnAbrirUbicacion.click({ force: true }).catch(async () => {
-                await btnAbrirUbicacion.evaluate(b => b.click());
+        const btnUbicacion = btnAbrirUbicacion.first();
+        if (await btnUbicacion.isVisible({ timeout: 6000 }).catch(() => false)) {
+            console.log("Haciendo clic en 'Ingresa tu ubicación' para abrir el modal...");
+            await btnUbicacion.click({ force: true }).catch(async () => {
+                await btnUbicacion.evaluate(b => b.click());
             });
             await this.page.waitForTimeout(2000);
         }
 
-        // 2. Buscar el input dentro del modal de ubicación (excluyendo el buscador del navbar)
-        const modalInput = this.page.locator('.Overlay input, .Modal input, [class*="modal"] input, [class*="Overlay"] input, [class*="SearchBar"] input')
-            .first()
-            .or(this.searchInput.first());
+        // 2. Esperar a que el modal de ubicación esté presente
+        const modalUbicacion = this.page.locator('.Overlay, .Modal, [role="dialog"], [class*="Modal"], [class*="Overlay"]').first();
+        await modalUbicacion.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {
+            console.log("Aviso: Esperando contenedor modal de ubicación...");
+        });
 
-        if (await modalInput.isVisible({ timeout: 5000 }).catch(() => false)) {
+        // 3. Buscar el input EXCLUSIVAMENTE dentro del modal de ubicación (para no escribir en el buscador de productos)
+        const modalInput = modalUbicacion.locator('input[type="text"], input[type="search"], input[placeholder*="dirección"], input[placeholder*="ubicación"], input').first();
+
+        if (await modalInput.isVisible({ timeout: 6000 }).catch(() => false)) {
             console.log(`Escribiendo ubicación en el modal: "${searchQuery}"...`);
             await modalInput.click().catch(() => {});
             await modalInput.fill(searchQuery);
             await modalInput.press('Enter');
-            await this.page.waitForTimeout(1500);
+            await this.page.waitForTimeout(2000);
         } else {
-            console.log("⚠️ No se encontró el input del modal de ubicación.");
+            console.log("⚠️ No se encontró el input dentro del modal de ubicación. Buscando fallback...");
+            const inputFallback = this.page.locator('.Overlay input, .Modal input, [role="dialog"] input').first();
+            if (await inputFallback.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await inputFallback.click();
+                await inputFallback.fill(searchQuery);
+                await inputFallback.press('Enter');
+                await this.page.waitForTimeout(2000);
+            }
         }
 
-        // 3. Seleccionar sugerencia en dropdown
+        // 4. Seleccionar sugerencia en el dropdown de direcciones
         const textoABuscar = fullAddress || searchQuery;
-        const opcionDropdown = this.page.locator('.Overlay, .SearchBar__dropdown, [class*="dropdown"], [class*="suggestion"], [class*="Overlay"]')
+        const opcionDropdown = this.page.locator('.Overlay, .SearchBar__dropdown, [class*="dropdown"], [class*="suggestion"], [class*="Overlay"], [role="option"]')
             .getByText(textoABuscar, { exact: false })
             .or(this.page.getByText(searchQuery, { exact: false }));
         
         if (await opcionDropdown.first().isVisible({ timeout: 5000 }).catch(() => false)) {
             console.log(`Seleccionando opción de dirección: "${textoABuscar}"...`);
             await opcionDropdown.first().click().catch(() => {});
-            await this.page.waitForTimeout(1500);
+            await this.page.waitForTimeout(2000);
         }
 
         await this.verificarLocalesCerrados();
 
-        // 4. Clic en tarjeta/barra oscura de dirección seleccionada
-        const barraOscuraUbicacion = this.page.locator('div, button, p, a').filter({ hasText: textoABuscar }).first();
+        // 5. Clic en tarjeta/barra oscura de dirección seleccionada si aparece
+        const barraOscuraUbicacion = modalUbicacion.locator('div, button, p, a').filter({ hasText: textoABuscar }).first();
         if (await barraOscuraUbicacion.isVisible({ timeout: 2000 }).catch(() => false)) {
-            console.log(`Haciendo clic en la tarjeta/barra de dirección seleccionada: "${textoABuscar}"...`);
+            console.log(`Haciendo clic en la dirección seleccionada: "${textoABuscar}"...`);
             await barraOscuraUbicacion.click({ force: true }).catch(async () => {
                 await barraOscuraUbicacion.evaluate(el => el.click());
             });
             await this.page.waitForTimeout(1500);
         }
 
-        // 5. Clic en botón Confirmar si aparece
-        const btnConfirmar = this.botonConfirmar.first()
-            .or(this.page.locator('button').filter({ hasText: /confirmar|aceptar|avançar|continuar/i })).first();
+        // 6. Clic en botón Confirmar del modal si aparece
+        const btnConfirmar = modalUbicacion.locator('button').filter({ hasText: /confirmar|aceptar|avançar|continuar/i }).first()
+            .or(this.botonConfirmar.first());
 
         if (await btnConfirmar.isVisible({ timeout: 3000 }).catch(() => false)) {
             console.log("Haciendo clic en Confirmar ubicación...");
@@ -254,7 +246,7 @@ export class HomePage {
 
         await this.page.waitForTimeout(2000);
 
-        // 6. Fallback de seguridad: si no ha redirigido al menú, ir a /menu directamente
+        // 7. Redirigir al menú si no cambió automáticamente
         if (!this.page.url().includes('/menu')) {
             console.log("Navegando directamente a /menu tras seleccionar ubicación de Delivery...");
             const currentUrl = this.page.url();
