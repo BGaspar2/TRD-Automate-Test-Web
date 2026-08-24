@@ -74,7 +74,8 @@ async function ejecutarFlujoDeliveryColombia(page, testInfo, metodoPago) {
         titulo: 'Método de Pago, Procesamiento y Detalle de la Orden',
         descripcion: `Selección de '${metodoPago}', procesamiento de pago y captura de número de orden`
     }, async () => {
-        await checkoutPage.seleccionarMetodoPago(metodoPago, testData.montoCambio);
+        const parametroPago = (metodoPago === testData.paymentMethods.tarjeta) ? testData.card : testData.montoCambio;
+        await checkoutPage.seleccionarMetodoPago(metodoPago, parametroPago);
         codigoPedidoGenerado = await checkoutPage.procesarPagoYConfirmarOrden();
 
         // Registrar metadatos en el informe ejecutivo
@@ -101,6 +102,10 @@ async function ejecutarFlujoDeliveryColombia(page, testInfo, metodoPago) {
 // =========================================================================
 // 🇨🇴 Casos de Prueba E2E - Métodos de Pago Colombia
 // =========================================================================
+
+test('Flujo E2E - Compra Delivery con Tarjeta Débito/Crédito (Colombia)', async ({ page }, testInfo) => {
+    await ejecutarFlujoDeliveryColombia(page, testInfo, testData.paymentMethods.tarjeta);
+});
 
 test('Flujo E2E - Compra Delivery con Datáfono (Colombia)', async ({ page }, testInfo) => {
     await ejecutarFlujoDeliveryColombia(page, testInfo, testData.paymentMethods.datafono);

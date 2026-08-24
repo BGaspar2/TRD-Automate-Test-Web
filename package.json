@@ -19,6 +19,7 @@
     "test:ecuador:pickup": "playwright test ecuador/pickup/flujoAnonimoPickup.js --headed",
     "test:ecuador:registro": "playwright test ecuador/auth/flujoRegistroOtp.js --headed",
     "test:colombia": "playwright test colombia/delivery/flujoAnonimoDel.js --headed --workers=1",
+    "test:colombia:tarjeta": "playwright test colombia/delivery/flujoAnonimoDel.js -g \"Tarjeta\" --headed",
     "test:colombia:datafono": "playwright test colombia/delivery/flujoAnonimoDel.js -g \"Datáfono\" --headed",
     "test:colombia:efectivo:exacto": "playwright test colombia/delivery/flujoAnonimoDel.js -g \"Monto Exacto\" --headed",
     "test:colombia:efectivo:cambio": "playwright test colombia/delivery/flujoAnonimoDel.js -g \"Con Cambio\" --headed",

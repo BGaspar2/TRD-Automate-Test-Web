@@ -274,18 +274,139 @@ export class CheckoutPage {
     }
 
     /**
+     * Completa el modal o formulario para agregar una nueva tarjeta de débito/crédito
+     * @param {object} cardData Datos de la tarjeta
+     */
+    async agregarNuevaTarjeta(cardData) {
+        console.log("Iniciando proceso para agregar nueva tarjeta...");
+
+        // 1. Localizar y hacer clic en 'Agregar nueva tarjeta' / '+ Nueva Tarjeta'
+        const btnAgregarTarjeta = this.page.locator('button, [role="button"], a, div, span')
+            .filter({ hasText: /agregar nueva tarjeta|nueva tarjeta|agregar tarjeta|añadir tarjeta|\+ agregar|agregar/i })
+            .last();
+
+        if (await btnAgregarTarjeta.isVisible({ timeout: 5000 }).catch(() => false)) {
+            console.log("Haciendo clic en 'Agregar nueva tarjeta'...");
+            await btnAgregarTarjeta.scrollIntoViewIfNeeded().catch(() => {});
+            await btnAgregarTarjeta.click({ force: true }).catch(async () => {
+                await btnAgregarTarjeta.evaluate(b => b.click());
+            });
+        }
+
+        await this.page.waitForTimeout(2000);
+
+        // 2. Verificar si el formulario está en el documento principal o dentro de un iframe
+        const frameOrPage = this.page;
+
+        console.log(`Ingresando número de tarjeta: ${cardData.number}...`);
+        // Número de Tarjeta
+        const inputNumero = frameOrPage.locator('input[name*="number" i], input[name*="card" i], input[placeholder*="número" i], input[placeholder*="numero" i], input[id*="card" i], input[autocomplete*="cc-number" i]').first()
+            .or(frameOrPage.locator('.CardNumber input, [class*="card"] input').first());
+
+        if (await inputNumero.isVisible({ timeout: 6000 }).catch(() => false)) {
+            await inputNumero.click();
+            await inputNumero.fill(cardData.numberClean || cardData.number);
+            await inputNumero.evaluate((el, v) => {
+                el.value = v;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }, cardData.numberClean || cardData.number).catch(() => {});
+        }
+
+        // Nombre del Titular
+        console.log(`Ingresando titular: "${cardData.name}"...`);
+        const inputTitular = frameOrPage.locator('input[name*="name" i], input[name*="holder" i], input[placeholder*="titular" i], input[placeholder*="nombre" i], input[id*="holder" i], input[autocomplete*="cc-name" i]').first();
+        if (await inputTitular.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await inputTitular.click();
+            await inputTitular.fill(cardData.name);
+            await inputTitular.evaluate((el, v) => {
+                el.value = v;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }, cardData.name).catch(() => {});
+        }
+
+        // Fecha de Expiración (Mes / Año o MM/AA)
+        console.log(`Ingresando fecha de expiración: "${cardData.expiry}"...`);
+        const inputExpiry = frameOrPage.locator('input[name*="exp" i], input[placeholder*="MM/AA" i], input[placeholder*="MM/YY" i], input[placeholder*="vencimiento" i], input[id*="exp" i]').first();
+        if (await inputExpiry.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await inputExpiry.click();
+            await inputExpiry.fill(cardData.expiry || '01/30');
+            await inputExpiry.evaluate((el, v) => {
+                el.value = v;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }, cardData.expiry || '01/30').catch(() => {});
+        } else {
+            // Inputs separados de Mes y Año
+            const inputMes = frameOrPage.locator('input[name*="month" i], select[name*="month" i], input[placeholder*="MM" i]').first();
+            const inputAnio = frameOrPage.locator('input[name*="year" i], select[name*="year" i], input[placeholder*="AA" i], input[placeholder*="YY" i]').first();
+            if (await inputMes.isVisible({ timeout: 1500 }).catch(() => false)) {
+                await inputMes.fill(cardData.expiryMonth || '01');
+            }
+            if (await inputAnio.isVisible({ timeout: 1500 }).catch(() => false)) {
+                await inputAnio.fill(cardData.expiryYear || '30');
+            }
+        }
+
+        // Código de Seguridad CVV
+        console.log(`Ingresando código de seguridad CVV: "${cardData.cvv}"...`);
+        const inputCvv = frameOrPage.locator('input[name*="cvv" i], input[name*="cvc" i], input[name*="code" i], input[placeholder*="CVV" i], input[placeholder*="CVC" i], input[placeholder*="seguridad" i], input[id*="cvv" i]').first();
+        if (await inputCvv.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await inputCvv.click();
+            await inputCvv.fill(cardData.cvv);
+            await inputCvv.evaluate((el, v) => {
+                el.value = v;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }, cardData.cvv).catch(() => {});
+        }
+
+        // Documento de Identidad (si aplica en el modal de tarjeta)
+        if (cardData.document) {
+            const inputDoc = frameOrPage.locator('input[name*="doc" i], input[name*="identification" i], input[placeholder*="documento" i], input[placeholder*="cédula" i], input[placeholder*="cedula" i], input[id*="doc" i]').first();
+            if (await inputDoc.isVisible({ timeout: 1500 }).catch(() => false)) {
+                console.log(`Ingresando documento en modal de tarjeta: "${cardData.document}"...`);
+                await inputDoc.click();
+                await inputDoc.fill(cardData.document);
+            }
+        }
+
+        await this.page.waitForTimeout(1000);
+
+        // 3. Guardar / Confirmar Tarjeta
+        console.log("Guardando tarjeta...");
+        const btnGuardarTarjeta = frameOrPage.locator('button[type="submit"], button')
+            .filter({ hasText: /guardar|agregar|confirmar|añadir|continuar|salvar/i })
+            .last();
+
+        if (await btnGuardarTarjeta.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await btnGuardarTarjeta.click({ force: true }).catch(async () => {
+                await btnGuardarTarjeta.evaluate(b => b.click());
+            });
+        }
+
+        // Esperar cierre del modal
+        await this.page.locator('.Modal, [role="dialog"]').first().waitFor({ state: 'hidden', timeout: 8000 }).catch(() => {});
+        await this.page.waitForTimeout(2000);
+        console.log("✅ Proceso de adición de tarjeta finalizado.");
+    }
+
+    /**
      * Selecciona el método de pago en Colombia:
+     * - 'Tarjeta' / 'Tarjeta Débito / Crédito'
      * - 'Datáfono'
      * - 'Efectivo (Monto exacto)'
      * - 'Efectivo (Con cambio)'
-     * @param {'datafono' | 'efectivo_exacto' | 'efectivo_cambio' | string} metodoPago
-     * @param {string|number} [montoCambio]
+     * @param {'tarjeta' | 'datafono' | 'efectivo_exacto' | 'efectivo_cambio' | string} metodoPago
+     * @param {string|number|object} [montoCambioOCard]
      */
-    async seleccionarMetodoPago(metodoPago = 'Datáfono', montoCambio = null) {
+    async seleccionarMetodoPago(metodoPago = 'Datáfono', montoCambioOCard = null) {
         const metodoLower = (metodoPago || '').toLowerCase();
-        const esDatafono = metodoLower.includes('datafono') || metodoLower.includes('datáfono') || metodoLower.includes('punto') || metodoLower === 'pos';
-        const esEfectivoCambio = metodoLower.includes('cambio') || metodoLower === 'efectivo_cambio';
-        const esEfectivoExacto = !esDatafono && !esEfectivoCambio;
+        const esTarjeta = metodoLower.includes('tarjeta') || metodoLower.includes('debito') || metodoLower.includes('débito') || metodoLower.includes('credito') || metodoLower.includes('crédito') || metodoLower === 'card';
+        const esDatafono = !esTarjeta && (metodoLower.includes('datafono') || metodoLower.includes('datáfono') || metodoLower.includes('punto') || metodoLower === 'pos');
+        const esEfectivoCambio = !esTarjeta && (metodoLower.includes('cambio') || metodoLower === 'efectivo_cambio');
+        const esEfectivoExacto = !esTarjeta && !esDatafono && !esEfectivoCambio;
 
         // 1. Esperar a que la página esté estable y hacer scroll
         await this.page.locator('.Modal, [role="dialog"], .Loading').first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
@@ -294,6 +415,44 @@ export class CheckoutPage {
         const seccionMetodoPago = this.page.locator('text=/método de pago|metodo de pago/i').first();
         await seccionMetodoPago.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
+
+        if (esTarjeta) {
+            console.log('Seleccionando método de pago en Colombia: "Tarjeta Débito / Crédito"...');
+
+            // 1. Clic en la opción principal 'Tarjeta'
+            const radioTarjeta = this.page.locator('label, [class*="Radio"], [class*="radio"]').filter({ hasText: /^tarjeta$/i }).first()
+                .or(this.page.getByText(/^tarjeta$/i).first());
+            if (await radioTarjeta.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await radioTarjeta.click({ force: true }).catch(() => {});
+            }
+
+            // 2. Clic en el sub-radio 'Débito / Crédito'
+            const subRadioDebito = this.page.locator('label, [class*="Radio"], [class*="radio"]').filter({ hasText: /débito \/ crédito|debito \/ credito/i }).first()
+                .or(this.page.getByText(/débito \/ crédito|debito \/ credito/i).first());
+            if (await subRadioDebito.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await subRadioDebito.click({ force: true }).catch(() => {});
+            }
+
+            await this.page.waitForTimeout(1500);
+
+            // 3. Si se pasaron datos de tarjeta o si el botón de agregar tarjeta está presente
+            const cardData = (typeof montoCambioOCard === 'object' && montoCambioOCard !== null) ? montoCambioOCard : {
+                number: "4111 1111 1111 1111",
+                numberClean: "4111111111111111",
+                expiry: "01/30",
+                expiryMonth: "01",
+                expiryYear: "30",
+                cvv: "123",
+                name: "APRO APRO",
+                document: "123456789"
+            };
+
+            await this.agregarNuevaTarjeta(cardData);
+
+            // Re-verificar que el checkbox de facturación permanezca marcado
+            await this.asegurarDatosFacturacion();
+            return;
+        }
 
         const nombreBuscar = esDatafono ? 'Datáfono' : 'Efectivo';
         console.log(`Seleccionando método de pago en Colombia: "${nombreBuscar}"...`);

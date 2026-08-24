@@ -23,9 +23,21 @@ export const testData = {
         document: "1012345678"
     },
     paymentMethods: {
+        tarjeta: "Tarjeta Débito / Crédito",
         datafono: "Datáfono",
         efectivoExacto: "Efectivo (Monto Exacto)",
         efectivoCambio: "Efectivo (Con Cambio)"
+    },
+    card: {
+        number: "4111 1111 1111 1111",
+        numberClean: "4111111111111111",
+        expiry: "01/30",
+        expiryMonth: "01",
+        expiryYear: "30",
+        expiryFullYear: "2030",
+        cvv: "123",
+        name: "APRO APRO",
+        document: "123456789"
     },
     montoCambio: "100000",
     registration: {
