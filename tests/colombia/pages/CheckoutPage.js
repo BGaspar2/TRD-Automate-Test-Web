@@ -280,20 +280,39 @@ export class CheckoutPage {
     async agregarNuevaTarjeta(cardData) {
         console.log("Iniciando proceso para agregar nueva tarjeta...");
 
-        // 1. Localizar y hacer clic en 'Agregar nueva tarjeta' / '+ Nueva Tarjeta'
-        const btnAgregarTarjeta = this.page.locator('button, [role="button"], a, div, span')
-            .filter({ hasText: /agregar nueva tarjeta|nueva tarjeta|agregar tarjeta|añadir tarjeta|\+ agregar|agregar/i })
-            .last();
+        // 1. Localizar y hacer clic en el botón '➕ Nueva tarjeta'
+        const btnNuevaTarjeta = this.page.locator('button, [role="button"], a, div')
+            .filter({ hasText: /nueva tarjeta/i })
+            .first();
 
-        if (await btnAgregarTarjeta.isVisible({ timeout: 5000 }).catch(() => false)) {
-            console.log("Haciendo clic en 'Agregar nueva tarjeta'...");
-            await btnAgregarTarjeta.scrollIntoViewIfNeeded().catch(() => {});
-            await btnAgregarTarjeta.click({ force: true }).catch(async () => {
-                await btnAgregarTarjeta.evaluate(b => b.click());
+        if (await btnNuevaTarjeta.isVisible({ timeout: 5000 }).catch(() => false)) {
+            console.log("Haciendo clic en el botón '➕ Nueva tarjeta'...");
+            await btnNuevaTarjeta.scrollIntoViewIfNeeded().catch(() => {});
+            
+            const box = await btnNuevaTarjeta.boundingBox().catch(() => null);
+            if (box) {
+                await this.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2).catch(() => {});
+            }
+            
+            await btnNuevaTarjeta.click({ force: true }).catch(async () => {
+                await btnNuevaTarjeta.evaluate(b => b.click());
             });
         }
 
+        // Disparo complementario en DOM
+        await this.page.evaluate(() => {
+            const all = Array.from(document.querySelectorAll('button, [role="button"], div, span, a'));
+            const btn = all.find(el => /nueva tarjeta/i.test((el.innerText || el.textContent || '').trim()));
+            if (btn) {
+                btn.click();
+                const parentBtn = btn.closest('button') || btn.closest('[role="button"]') || btn.parentElement;
+                if (parentBtn) parentBtn.click();
+            }
+        }).catch(() => {});
+
+        // Esperar a que el modal o los campos de tarjeta aparezcan
         await this.page.waitForTimeout(2000);
+        await this.page.locator('.Modal, [role="dialog"], [class*="modal" i], input[placeholder*="número" i], input[name*="number" i]').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
 
         // 2. Verificar si el formulario está en el documento principal o dentro de un iframe
         const frameOrPage = this.page;
