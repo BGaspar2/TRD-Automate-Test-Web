@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
+    "test:delivery:pagos": "playwright test colombia/delivery/flujoAnonimoDel.js ecuador/delivery/flujoAnonimoDel.js venezuela/delivery/flujoAnonimoDel.js --headed --workers=1",
+    "test:delivery:pagos:headless": "playwright test colombia/delivery/flujoAnonimoDel.js ecuador/delivery/flujoAnonimoDel.js venezuela/delivery/flujoAnonimoDel.js --workers=1",
     "test:regional": "playwright test flujoRegionalAnonimo.js --headed --workers=1",
     "test:regional:headless": "playwright test flujoRegionalAnonimo.js --workers=1",
     "test:regional:registro": "playwright test flujoRegistroOtp.js --headed --workers=1",
