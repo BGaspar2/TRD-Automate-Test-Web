@@ -481,28 +481,52 @@ export class CheckoutPage {
         for (let intento = 1; intento <= 5; intento++) {
             await this.page.waitForTimeout(1000);
 
-            // 1. Inyección y detección por DOM en tiempo real
+            // 1. Inyección y detección por DOM estricta
             const resDom = await this.page.evaluate((val) => {
-                const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])'));
-                for (const inp of allInputs) {
-                    const parentText = (inp.closest('div, label, section, form')?.innerText || '').toLowerCase();
-                    const placeholder = (inp.placeholder || '').toLowerCase();
-                    const name = (inp.name || '').toLowerCase();
-                    const id = (inp.id || '').toLowerCase();
-                    
-                    if (parentText.includes('cvv') || placeholder.includes('012') || placeholder.includes('cvv') || placeholder.includes('000') || name.includes('cvv') || id.includes('cvv') || parentText.includes('seguridad')) {
-                        inp.focus();
-                        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-                        if (setter) setter.call(inp, val);
-                        else inp.value = val;
-                        inp.dispatchEvent(new Event('input', { bubbles: true }));
-                        inp.dispatchEvent(new Event('change', { bubbles: true }));
-                        inp.dispatchEvent(new Event('blur', { bubbles: true }));
-                        
-                        const rect = inp.getBoundingClientRect();
-                        return { found: true, rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } };
+                // Estrategia A: Buscar por el texto exacto 'Ingresa el CVV' o 'CVV de tu tarjeta'
+                const allElements = Array.from(document.querySelectorAll('*'));
+                const labelNode = allElements.reverse().find(el => {
+                    const text = (el.innerText || el.textContent || '').trim();
+                    return /ingresa el cvv/i.test(text) && text.length < 50;
+                });
+
+                if (labelNode) {
+                    let container = labelNode.parentElement;
+                    for (let i = 0; i < 4 && container; i++) {
+                        const inputs = Array.from(container.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])'));
+                        for (const inp of inputs) {
+                            const idOrName = ((inp.id || '') + ' ' + (inp.name || '') + ' ' + (inp.placeholder || '')).toLowerCase();
+                            // Excluir absolutamente campos personales
+                            if (!idOrName.includes('document') && !idOrName.includes('name') && !idOrName.includes('phone') && !idOrName.includes('email') && !idOrName.includes('street') && !idOrName.includes('rut')) {
+                                inp.focus();
+                                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+                                if (setter) setter.call(inp, val);
+                                else inp.value = val;
+                                inp.dispatchEvent(new Event('input', { bubbles: true }));
+                                inp.dispatchEvent(new Event('change', { bubbles: true }));
+                                inp.dispatchEvent(new Event('blur', { bubbles: true }));
+                                const rect = inp.getBoundingClientRect();
+                                return { found: true, rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } };
+                            }
+                        }
+                        container = container.parentElement;
                     }
                 }
+
+                // Estrategia B: Buscar input con placeholder exacto '012'
+                const input012 = Array.from(document.querySelectorAll('input')).find(inp => (inp.placeholder || '').trim() === '012');
+                if (input012) {
+                    input012.focus();
+                    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+                    if (setter) setter.call(input012, val);
+                    else input012.value = val;
+                    input012.dispatchEvent(new Event('input', { bubbles: true }));
+                    input012.dispatchEvent(new Event('change', { bubbles: true }));
+                    input012.dispatchEvent(new Event('blur', { bubbles: true }));
+                    const rect = input012.getBoundingClientRect();
+                    return { found: true, rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } };
+                }
+
                 return { found: false };
             }, cvvValor).catch(() => ({ found: false }));
 
@@ -516,9 +540,9 @@ export class CheckoutPage {
                 break;
             }
 
-            // 2. Localizadores directos de Playwright
-            const inputCvvAfuera = this.page.locator('input[placeholder*="012" i], input[placeholder*="CVV" i], input[placeholder*="000" i], input[name*="cvv" i], input[name*="cvc" i], input[id*="cvv" i]')
-                .or(this.page.locator('div:has-text("CVV") input, label:has-text("CVV") input, div:has-text("Ingresa el CVV") input, label:has-text("Ingresa el CVV") input').first())
+            // 2. Localizadores directos de Playwright estrictos
+            const inputCvvAfuera = this.page.locator('text=/ingresa el cvv/i').locator('..').locator('input:not([name="document"]):not(#document)')
+                .or(this.page.locator('input[placeholder="012"]'))
                 .first();
 
             if (await inputCvvAfuera.isVisible({ timeout: 1000 }).catch(() => false)) {
