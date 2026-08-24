@@ -244,45 +244,67 @@ export class CheckoutPage {
         const regexNombre = esDatafono ? /dat[aá]fono/i : /^efectivo$/i;
 
         for (let intento = 1; intento <= 6; intento++) {
-            // Clic en el label que contiene el texto
-            const labelDirect = this.page.locator('label').filter({ hasText: regexNombre }).first();
-            if (await labelDirect.isVisible().catch(() => false)) {
-                await labelDirect.scrollIntoViewIfNeeded().catch(() => {});
-                await labelDirect.click().catch(async () => {
-                    await labelDirect.click({ force: true });
-                });
-            } else {
-                const textDirect = this.page.getByText(regexNombre).first();
-                if (await textDirect.isVisible().catch(() => false)) {
-                    await textDirect.click({ force: true }).catch(() => {});
+            // 1. Encontrar el texto "Datáfono" o "Efectivo"
+            const textLocator = this.page.getByText(regexNombre).last();
+            if (await textLocator.isVisible().catch(() => false)) {
+                await textLocator.scrollIntoViewIfNeeded().catch(() => {});
+                
+                // Clic en el texto
+                await textLocator.click({ force: true }).catch(() => {});
+                
+                // Clic físico en el círculo del radio (a la izquierda del texto)
+                const box = await textLocator.boundingBox().catch(() => null);
+                if (box) {
+                    await this.page.mouse.click(box.x - 22, box.y + box.height / 2).catch(() => {});
+                    await this.page.mouse.click(box.x - 14, box.y + box.height / 2).catch(() => {});
                 }
             }
 
-            // Refuerzo en DOM
+            // 2. Clic en label o contenedor
+            const labelDirect = this.page.locator('label, [class*="Radio"], [class*="radio"]').filter({ hasText: regexNombre }).last();
+            if (await labelDirect.isVisible().catch(() => false)) {
+                await labelDirect.click({ force: true }).catch(() => {});
+            }
+
+            // 3. Disparo a nivel DOM y React Props
             await this.page.evaluate((esDatafonoFlag) => {
                 const targetRegex = esDatafonoFlag ? /dat[aá]fono/i : /^efectivo$/i;
-                const allNodes = Array.from(document.querySelectorAll('label, div, span, p, input[type="radio"]'));
-                for (const el of allNodes) {
-                    const txt = (el.innerText || el.textContent || el.value || '').trim();
-                    if (targetRegex.test(txt)) {
-                        el.click();
-                        const label = el.closest('label') || el.parentElement;
-                        if (label) label.click();
-                        const input = label?.querySelector('input[type="radio"]') || el.parentElement?.querySelector('input[type="radio"]');
-                        if (input) {
-                            input.checked = true;
-                            input.click();
-                            input.dispatchEvent(new Event('input', { bubbles: true }));
-                            input.dispatchEvent(new Event('change', { bubbles: true }));
+                const allNodes = Array.from(document.querySelectorAll('*'));
+                
+                const matchNode = allNodes.reverse().find(el => {
+                    const txt = (el.innerText || el.textContent || '').trim();
+                    return targetRegex.test(txt) && txt.length < 25;
+                });
+
+                if (matchNode) {
+                    matchNode.click();
+                    let parent = matchNode.parentElement;
+                    let depth = 0;
+                    while (parent && parent !== document.body && depth < 4) {
+                        parent.click();
+                        
+                        const reactKey = Object.keys(parent).find(k => k.startsWith('__reactProps'));
+                        if (reactKey && parent[reactKey] && typeof parent[reactKey].onClick === 'function') {
+                            parent[reactKey].onClick({ preventDefault: () => {}, stopPropagation: () => {} });
                         }
-                        break;
+
+                        const radio = parent.querySelector('input[type="radio"]');
+                        if (radio) {
+                            radio.checked = true;
+                            radio.click();
+                            radio.dispatchEvent(new Event('input', { bubbles: true }));
+                            radio.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+
+                        parent = parent.parentElement;
+                        depth++;
                     }
                 }
             }, esDatafono).catch(() => {});
 
             await this.page.waitForTimeout(1500);
 
-            // Verificar si 'Débito / Crédito' y 'No olvides ingresar tu tarjeta' desaparecieron
+            // 4. Verificar si 'Débito / Crédito' y 'No olvides ingresar tu tarjeta' desaparecieron
             const advertenciaTarjeta = this.page.locator('text=/no olvides ingresar tu tarjeta|débito \\/ crédito/i');
             const sigueTarjeta = await advertenciaTarjeta.first().isVisible({ timeout: 1000 }).catch(() => false);
             if (!sigueTarjeta) {
