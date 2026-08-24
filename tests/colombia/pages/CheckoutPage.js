@@ -367,70 +367,80 @@ export class CheckoutPage {
             scope = this.page.locator('.PaymentMethods, [class*="PaymentMethod"], [class*="payment" i]').last();
         }
 
-        // 1. Número de Tarjeta
-        console.log(`Ingresando número de tarjeta en el modal: ${cardData.number}...`);
-        const inputNumero = scope.locator('input[placeholder*="número" i], input[placeholder*="numero" i], input[name*="number" i], input[name*="card" i], input[id*="card" i], input[autocomplete*="cc-number" i]').first();
-        if (await inputNumero.isVisible({ timeout: 5000 }).catch(() => false)) {
-            await inputNumero.click();
-            await inputNumero.fill(cardData.numberClean || cardData.number);
-            await inputNumero.evaluate((el, v) => {
-                el.value = v;
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-                el.dispatchEvent(new Event('blur', { bubbles: true }));
-            }, cardData.numberClean || cardData.number).catch(() => {});
-        }
-
-        // 2. Mes de expiración (Placeholder MM o contenedor Mes)
-        const mesAEnviar = String(cardData.expiryMonth || '01');
-        console.log(`Ingresando Mes de expiración: "${mesAEnviar}"...`);
-        const inputMes = scope.locator('input[placeholder="MM"], input[placeholder*="MM" i], input[name*="month" i], input[id*="month" i]').first()
-            .or(scope.locator('div:has-text("Mes") input, label:has-text("Mes") input').first());
-
-        if (await inputMes.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await inputMes.click();
-            await inputMes.fill(mesAEnviar);
-            await inputMes.evaluate((el, v) => {
-                el.value = v;
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-                el.dispatchEvent(new Event('blur', { bubbles: true }));
-            }, mesAEnviar).catch(() => {});
-        }
-
-        // 3. Año de expiración (Placeholder YYYY o contenedor Año de expiración)
+        // Llenado ordenado de los 4 campos del modal de tarjeta
         const anioAEnviar = String(cardData.expiryFullYear || cardData.expiryYear || '2030');
-        console.log(`Ingresando Año de expiración (YYYY): "${anioAEnviar}"...`);
-        const inputAnio = scope.locator('input[placeholder="YYYY"], input[placeholder*="YYYY" i], input[name*="year" i], input[id*="year" i]').first()
-            .or(scope.locator('div:has-text("Año") input, label:has-text("Año") input, div:has-text("Ano") input').first());
-
-        if (await inputAnio.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await inputAnio.click();
-            await inputAnio.fill(anioAEnviar);
-            await inputAnio.evaluate((el, v) => {
-                el.value = v;
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-                el.dispatchEvent(new Event('blur', { bubbles: true }));
-            }, anioAEnviar).catch(() => {});
-        }
-
-        // 4. Código de Seguridad CVV
+        const mesAEnviar = String(cardData.expiryMonth || '01');
         const cvvAEnviar = String(cardData.cvv || '123');
-        console.log(`Ingresando código de seguridad CVV: "${cvvAEnviar}"...`);
-        const inputCvv = scope.locator('input[placeholder*="CVV" i], input[placeholder*="CVC" i], input[name*="cvv" i], input[name*="cvc" i], input[placeholder*="seguridad" i], input[id*="cvv" i]').first()
-            .or(scope.locator('div:has-text("Código de seguridad") input, label:has-text("Código de seguridad") input, div:has-text("CVV") input').first());
+        const numAEnviar = String(cardData.numberClean || cardData.number);
 
-        if (await inputCvv.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await inputCvv.click();
-            await inputCvv.fill(cvvAEnviar);
-            await inputCvv.evaluate((el, v) => {
-                el.value = v;
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-                el.dispatchEvent(new Event('blur', { bubbles: true }));
-            }, cvvAEnviar).catch(() => {});
+        console.log(`Llenando formulario de tarjeta: Num=${numAEnviar}, Mes=${mesAEnviar}, Año=${anioAEnviar}, CVV=${cvvAEnviar}...`);
+
+        const textInputs = scope.locator('input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])');
+        const count = await textInputs.count().catch(() => 0);
+        console.log(`Total de inputs de texto detectados en el modal: ${count}`);
+
+        // 1. Número de Tarjeta
+        const inpCard = count >= 4 ? textInputs.nth(0) : scope.locator('input[placeholder*="número" i], input[name*="number" i], input[name*="card" i]').first();
+        if (await inpCard.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await inpCard.click();
+            await inpCard.fill('');
+            await inpCard.pressSequentially(numAEnviar, { delay: 40 });
         }
+
+        // 2. Mes
+        const inpMes = count >= 4 ? textInputs.nth(1) : scope.locator('input[placeholder*="MM" i], input[name*="month" i], div:has-text("Mes") input').first();
+        if (await inpMes.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await inpMes.click();
+            await inpMes.fill('');
+            await inpMes.pressSequentially(mesAEnviar, { delay: 40 });
+        }
+
+        // 3. Año de expiración
+        const inpAnio = count >= 4 ? textInputs.nth(2) : scope.locator('input[placeholder*="YYYY" i], input[name*="year" i], div:has-text("Año") input').first();
+        if (await inpAnio.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await inpAnio.click();
+            await inpAnio.fill('');
+            await inpAnio.pressSequentially(anioAEnviar, { delay: 40 });
+        }
+
+        // 4. CVV
+        const inpCvv = count >= 4 ? textInputs.nth(3) : scope.locator('input[placeholder*="CVV" i], input[placeholder*="000" i], input[name*="cvv" i]').first();
+        if (await inpCvv.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await inpCvv.click();
+            await inpCvv.fill('');
+            await inpCvv.pressSequentially(cvvAEnviar, { delay: 40 });
+        }
+
+        // Inyección de respaldo con React Native Setter en el DOM del modal
+        await this.page.evaluate(({ cardNum, mes, anio, cvv }) => {
+            const modal = document.querySelector('.Modal, [role="dialog"], [class*="modal" i]') || document;
+            const inputs = Array.from(modal.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])'));
+            const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+            
+            const fillInp = (input, val) => {
+                if (!input) return;
+                input.focus();
+                if (setter) setter.call(input, val);
+                else input.value = val;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                input.dispatchEvent(new Event('blur', { bubbles: true }));
+            };
+
+            if (inputs.length >= 4) {
+                fillInp(inputs[0], cardNum);
+                fillInp(inputs[1], mes);
+                fillInp(inputs[2], anio);
+                fillInp(inputs[3], cvv);
+            }
+        }, {
+            cardNum: numAEnviar,
+            mes: mesAEnviar,
+            anio: anioAEnviar,
+            cvv: cvvAEnviar
+        }).catch(() => {});
+
+        await this.page.waitForTimeout(1000);
 
         // 5. Checkbox "Utilizar mismos datos de la compra" (asegurar que esté marcado)
         const checkMismosDatos = scope.locator('input[type="checkbox"], [role="checkbox"], label').filter({ hasText: /utilizar mismos datos/i }).first();
