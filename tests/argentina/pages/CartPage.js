@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 export class CartPage {
     /**
@@ -10,21 +10,42 @@ export class CartPage {
         this.modalCarrito = page.locator('.ProductInCartModal, [class*="ProductInCartModal"], [class*="cart-modal"]');
         this.btnIconoCarrito = page.locator('a[href*="/cart"], a[href*="/checkout"], [data-testid*="cart"], button:has(svg.feather-shopping-bag), .FloatingCart, .HeaderCart, .CartButton');
 
+        // Locators para banners de validación de monto mínimo y máximo
         this.alertaMinimo = page.locator('.OrderMinimumAlert, [class*="minimum"], [class*="Alert"], [class*="alert"], [class*="Banner"]')
             .filter({ hasText: /pedido mínimo|mínimo es de|agrega más productos/i });
 
         this.alertaMaximo = page.locator('.OrderMaximumAlert, [class*="maximum"], [class*="Alert"], [class*="alert"], [class*="Banner"]')
             .filter({ hasText: /pedido máximo|máximo es de|supera el máximo|disminuye/i });
 
+        // Botones de ajuste de cantidad en el carrito
         this.btnAumentarCantidad = page.locator('button:has-text("+"), [aria-label*="aumentar"], [class*="plus"], button:has(svg.feather-plus)').first();
         this.btnDisminuirCantidad = page.locator('button:has-text("-"), [aria-label*="disminuir"], [class*="minus"], button:has(svg.feather-minus)').first();
     }
 
+    async verificarLocalesCerrados() {
+        const alertaCerrados = this.page.locator('.Alert, [class*="alert"], [class*="Banner"], [class*="danger"], [class*="error"], div, p, span')
+            .filter({ hasText: /locales se encuentran cerrados|tiendas cerradas|lojas fechadas|intenta más tarde|cerrados|arma tu pedido|sé el primero en ordenar|seja o primeiro a pedir|nuestro horario|nosso horário|nosso horario|cuando abramos|quando abrirmos/i }).first();
+
+        if (await alertaCerrados.isVisible({ timeout: 1500 }).catch(() => false)) {
+            const mensaje = await alertaCerrados.innerText().catch(() => 'Los locales se encuentran cerrados.');
+            console.log(`⚠️ ALERTA DE LOCALES CERRADOS DETECTADA EN CARRITO: "${mensaje.trim()}". Omitiendo la prueba (test.skip)...`);
+            test.skip(true, `Test omitido: ${mensaje.trim()}`);
+        }
+    }
+
+    /**
+     * Valida si el carrito cumple con el monto mínimo y no supera el monto máximo.
+     * Si no cumple el mínimo, aumenta la cantidad (+). Si supera el máximo, disminuye (-).
+     * @param {number} maxIntentos Límite máximo de reintentos para evitar bucles infinitos.
+     */
     async validarYAjustarMontoCarrito(maxIntentos = 10) {
+        await this.verificarLocalesCerrados();
         console.log("Validando reglas de monto mínimo/máximo en el carrito...");
 
+        // 1. Validar y ajustar pedido mínimo (Incrementar cantidad con +)
         let intentos = 0;
         while (await this.alertaMinimo.first().isVisible().catch(() => false) && intentos < maxIntentos) {
+            await this.verificarLocalesCerrados();
             const texto = await this.alertaMinimo.first().textContent().catch(() => '');
             console.log(`[Monto mínimo detectado]: "${texto.trim()}". Aumentando cantidad (+)...`);
 
@@ -38,8 +59,10 @@ export class CartPage {
             intentos++;
         }
 
+        // 2. Validar y ajustar pedido máximo (Disminuir cantidad con -)
         intentos = 0;
         while (await this.alertaMaximo.first().isVisible().catch(() => false) && intentos < maxIntentos) {
+            await this.verificarLocalesCerrados();
             const texto = await this.alertaMaximo.first().textContent().catch(() => '');
             console.log(`[Monto máximo detectado]: "${texto.trim()}". Disminuyendo cantidad (-)...`);
 
@@ -52,22 +75,18 @@ export class CartPage {
             }
             intentos++;
         }
-
-        const sigueAlertaMinimo = await this.alertaMinimo.first().isVisible().catch(() => false);
-        if (!sigueAlertaMinimo) {
-            console.log("✓ Carrito validado correctamente con respecto a los montos requeridos.");
-        } else {
-            console.warn("⚠️ La alerta de pedido mínimo continúa visible tras ajustar la cantidad.");
-        }
     }
 
     async procesarModalCarrito() {
-        const modal = this.modalCarrito.first();
-        const modalVis = await modal.isVisible({ timeout: 8000 }).catch(() => false);
+        console.log("Procesando modal/drawer del carrito...");
+        await this.verificarLocalesCerrados();
+        await this.page.waitForTimeout(2000);
 
-        if (modalVis) {
-            console.log("Modal de producto añadido detectado.");
-            const btnVerCarrito = modal.getByRole('button', { name: /ver carrito|ir al carrito|carrinho|ver carrinho|ir para o carrinho/i })
+        const modal = this.modalCarrito.first();
+        if (await modal.isVisible({ timeout: 5000 }).catch(() => false)) {
+            console.log("Modal del carrito visible. Buscando botón para ver carrito / pagar...");
+            await this.verificarLocalesCerrados();
+            const btnVerCarrito = modal.locator('button, a').filter({ hasText: /ver carrito|ir a pagar|ver carrinho|ir para o pagamento|fazer pedido|concluir/i }).first()
                 .or(modal.locator('button, a').filter({ hasText: /carrito|carrinho/i })).first();
             
             await btnVerCarrito.click().catch(() => {});
@@ -80,11 +99,13 @@ export class CartPage {
                 console.log("Navegando al carrito mediante botón flotante/encabezado...");
             }
         }
-        await this.page.waitForTimeout(5000);
+        await this.page.waitForTimeout(3000);
+        await this.verificarLocalesCerrados();
     }
 
     async irAPagar() {
         console.log("Navegando al checkout ('Ir a pagar' / 'Ir para o pagamento')...");
+        await this.verificarLocalesCerrados();
 
         const candidatos = this.page.locator('.OrderTotal, button:has-text("Ir a pagar"), a:has-text("Ir a pagar"), button:has-text("Ir para o pagamento"), button[type="submit"]')
             .filter({ hasText: /ir a pagar|pagar|proceder|finalizar|checkout|ir para o pagamento|pagamento|fazer pedido|concluir/i });
@@ -108,6 +129,7 @@ export class CartPage {
         await btnVisible.click({ force: true }).catch(async () => {
             await btnVisible.evaluate(b => b.click());
         });
-        await this.page.waitForTimeout(5000);
+        await this.page.waitForTimeout(3000);
+        await this.verificarLocalesCerrados();
     }
 }

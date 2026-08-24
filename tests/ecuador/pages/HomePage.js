@@ -40,11 +40,11 @@ export class HomePage {
 
     async verificarLocalesCerrados() {
         const alertaCerrados = this.page.locator('.Alert, [class*="alert"], [class*="Banner"], [class*="danger"], [class*="error"], div, p, span')
-            .filter({ hasText: /locales se encuentran cerrados|tiendas cerradas|lojas fechadas|intenta más tarde|cerrados/i }).first();
+            .filter({ hasText: /locales se encuentran cerrados|tiendas cerradas|lojas fechadas|intenta más tarde|cerrados|arma tu pedido|sé el primero en ordenar|seja o primeiro a pedir|nuestro horario|nosso horário|nosso horario|cuando abramos|quando abrirmos/i }).first();
 
-        if (await alertaCerrados.isVisible({ timeout: 2000 }).catch(() => false)) {
+        if (await alertaCerrados.isVisible({ timeout: 1500 }).catch(() => false)) {
             const mensaje = await alertaCerrados.innerText().catch(() => 'Los locales se encuentran cerrados.');
-            console.log(`⚠️ ALERTA DETECTADA: "${mensaje.trim()}". Omitiendo la prueba (test.skip)...`);
+            console.log(`⚠️ ALERTA DE LOCALES CERRADOS DETECTADA: "${mensaje.trim()}". Omitiendo la prueba (test.skip)...`);
             test.skip(true, `Test omitido: ${mensaje.trim()}`);
         }
     }

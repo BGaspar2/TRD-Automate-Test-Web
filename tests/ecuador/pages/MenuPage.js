@@ -130,7 +130,7 @@ export class MenuPage {
                 if (match) {
                     const actual = parseInt(match[1]);
                     const requerido = parseInt(match[2]);
-                    if (actual < requerido && actual === 0) {
+                    if (actual < requerido) {
                         requiereSeleccion = true;
                         faltantes = requerido - actual;
                     }

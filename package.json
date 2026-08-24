@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Automated E2E tests for KFC LATAM websites",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "test": "playwright test",
     "test:regional": "playwright test flujoRegionalAnonimo.js --headed --workers=1",
@@ -16,7 +17,9 @@
     "test:venezuela": "playwright test venezuela/delivery/flujoAnonimoDel.js --headed",
     "test:venezuela:pickup": "playwright test venezuela/pickup/flujoAnonimoPickup.js --headed",
     "test:brasil:pickup": "playwright test brasil/pickup/flujoAnonimoPickup.js --headed",
-    "test:argentina:pickup": "playwright test argentina/pickup/flujoAnonimoPickup.js --headed"
+    "test:argentina:pickup": "playwright test argentina/pickup/flujoAnonimoPickup.js --headed",
+    "report:ejecutivo": "node utils/abrirReporte.js",
+    "report:tecnico": "playwright show-report playwright-report/tecnico"
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",
