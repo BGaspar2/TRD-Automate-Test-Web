@@ -4,36 +4,61 @@ import { HomePage } from '../pages/HomePage.js';
 import { MenuPage } from '../pages/MenuPage.js';
 import { CartPage } from '../pages/CartPage.js';
 import { CheckoutPage } from '../pages/CheckoutPage.js';
+import { ejecutarPaso } from '../../../utils/pasos.js';
 
-test('Flujo E2E - Compra a domicilio usuario anónimo (Colombia)', async ({ page }) => {
+test('Flujo E2E - Compra a domicilio usuario anónimo (Colombia)', async ({ page }, testInfo) => {
     const homePage = new HomePage(page);
     const menuPage = new MenuPage(page);
     const cartPage = new CartPage(page);
     const checkoutPage = new CheckoutPage(page);
 
-    // 1. Navegación y Ubicación
-    await homePage.navegar(testData.baseUrl);
-    await homePage.seleccionarCanalDomicilio();
-    await homePage.configurarUbicacion(testData.location.searchQuery, testData.location.fullAddress);
+    // Paso 1: Navegación y Ubicación
+    await ejecutarPaso(page, testInfo, {
+        numero: 1,
+        titulo: 'Navegación y Configuración de Dirección Delivery',
+        descripcion: 'Ingreso a KFC Colombia y configuración de dirección para entrega a domicilio'
+    }, async () => {
+        await homePage.navegar(testData.baseUrl);
+        await homePage.seleccionarCanalDomicilio();
+        await homePage.configurarUbicacion(testData.location.searchQuery, testData.location.fullAddress);
+    });
 
-    // 2. Selección de Productos y Modificadores
-    await menuPage.seleccionarCategoriaAleatoria();
-    await menuPage.seleccionarProductoAleatorio();
-    await menuPage.ajustarCantidad(testData.order.desiredQuantity);
-    await menuPage.validarYSeleccionarModificadores();
-    await menuPage.agregarAlCarrito(testData.order.desiredQuantity);
+    // Paso 2: Selección de Productos y Modificadores
+    await ejecutarPaso(page, testInfo, {
+        numero: 2,
+        titulo: 'Selección de Menú y Personalización de Producto',
+        descripcion: 'Elección de categoría, producto aleatorio, modificadores y agregado al pedido'
+    }, async () => {
+        await menuPage.seleccionarCategoriaAleatoria();
+        await menuPage.seleccionarProductoAleatorio();
+        await menuPage.ajustarCantidad(testData.order.desiredQuantity);
+        await menuPage.validarYSeleccionarModificadores();
+        await menuPage.agregarAlCarrito(testData.order.desiredQuantity);
+    });
 
-    // 3. Carrito e Inicio de Pago
-    await cartPage.procesarModalCarrito();
-    await cartPage.validarYAjustarMontoCarrito();
-    await cartPage.irAPagar();
+    // Paso 3: Carrito e Inicio de Pago
+    await ejecutarPaso(page, testInfo, {
+        numero: 3,
+        titulo: 'Revisión y Validación del Carrito de Compras',
+        descripcion: 'Verificación de montos mínimos/máximos y avance al pago'
+    }, async () => {
+        await cartPage.procesarModalCarrito();
+        await cartPage.validarYAjustarMontoCarrito();
+        await cartPage.irAPagar();
+    });
 
-    // 4. Checkout y Confirmación de Datos
-    await checkoutPage.iniciarCompletar();
-    await checkoutPage.llenarDireccionEntrega(testData.deliveryAddress);
-    await checkoutPage.llenarDatosPersonales(testData.customer);
-    await checkoutPage.seleccionarMetodoPago(testData.paymentMethodId);
+    // Paso 4: Checkout y Confirmación de Datos
+    await ejecutarPaso(page, testInfo, {
+        numero: 4,
+        titulo: 'Dirección de Entrega, Datos Personales y Pago',
+        descripcion: 'Ingreso de dirección de entrega, datos del cliente y método de pago'
+    }, async () => {
+        await checkoutPage.iniciarCompletar();
+        await checkoutPage.llenarDireccionEntrega(testData.deliveryAddress);
+        await checkoutPage.llenarDatosPersonales(testData.customer);
+        await checkoutPage.seleccionarMetodoPago(testData.paymentMethodId);
+    });
 
-    console.log("Flujo de prueba finalizado.");
+    console.log("Flujo Colombia Delivery finalizado con éxito.");
     await page.waitForTimeout(5000);
 });

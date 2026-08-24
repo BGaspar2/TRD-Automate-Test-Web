@@ -22,6 +22,8 @@ La suite automatiza el flujo completo de compra en usuario anónimo para **6 pa�
 ## 🚀 Características y Estrategia de Selección Resiliente
 
 - **Arquitectura Page Object Model (POM):** Separación modular de locators, datos de prueba y lógica por páginas (`HomePage`, `MenuPage`, `CartPage`, `CheckoutPage`).
+- **Paso a Paso de Negocio con Capturas Automáticas:** Integración mediante `ejecutarPaso(...)` que captura evidencia fotográfica en cada etapa del flujo (Ubicación, Selección de Producto, Carrito y Checkout).
+- **Ejecución Regional Resiliente:** La suite regional ejecuta todos los países de forma secuencial pero independiente; si un país falla, se registra la evidencia y continúa con los siguientes países sin detener la suite.
 - **Soporte Bicanal (Delivery & Pickup):** Pruebas ajustadas según las particularidades de cada modo (mapas, listados de tiendas, datos de envío o retiro directo).
 - **Selección Directa de Tienda en React:** Disparo de eventos nativos sintéticos (`__reactProps`) e interacción resiliente con los elementos de la tienda para activar los manipuladores globales (`moveCartHandler` / `selectStoreHandler`).
 - **Análisis Dinámico de Modificadores (Fracción X / Y):** Cálculo automático de opciones faltantes en grupos obligatorios (ej. `1 / 2` o `0 / 1`), agregando ítems dinámicamente hasta erradicar la alerta *"Debes escoger N opciones"*.
@@ -53,16 +55,14 @@ La suite automatiza el flujo completo de compra en usuario anónimo para **6 pa�
 ```text
 TRD-Automate-Test-Web/
 ├── tests/
-│   ├── flujoRegionalAnonimo.js   # SUITE MÁSTER REGIONAL (Ejecución LATAM)
+│   ├── flujoRegionalAnonimo.js   # SUITE MÁSTER REGIONAL (Ejecución LATAM independiente)
 │   ├── argentina/
 │   │   ├── data/testData.js
 │   │   ├── pages/ (HomePage, MenuPage, CartPage, CheckoutPage)
-│   │   ├── delivery/
 │   │   └── pickup/flujoAnonimoPickup.js
 │   ├── brasil/
 │   │   ├── data/testData.js
 │   │   ├── pages/ (HomePage, MenuPage, CartPage, CheckoutPage)
-│   │   ├── delivery/
 │   │   └── pickup/flujoAnonimoPickup.js
 │   ├── chile/
 │   │   ├── data/testData.js
@@ -86,6 +86,11 @@ TRD-Automate-Test-Web/
 │   │   └── pickup/flujoAnonimoPickup.js
 │   ├── auth.js                   # Autenticación persistente
 │   └── flujoRegistradoDel.js     # Flujo E2E usuario registrado
+├── utils/
+│   ├── pasos.js                  # Helper de pasos de negocio y capturas de pantalla
+│   ├── abrirReporte.js           # Script para abrir informe ejecutivo en el navegador
+│   └── reporters/
+│       └── spanish-executive-reporter.js # Custom Reporter oficial en Español
 ├── playwright.config.ts          # Configuración del Runner de Playwright
 ├── package.json
 └── README.md
@@ -165,11 +170,34 @@ TRD-Automate-Test-Web/
 
 ---
 
-## 📊 Ver Reportes HTML
+## 📊 Informes de Pruebas (Reportes en Español y Paso a Paso)
 
-Después de cualquier ejecución, puedes visualizar el reporte gráfico interactivo de Playwright:
+El proyecto cuenta con un sistema de reportes enriquecido diseñado tanto para **equipos técnicos (QA/Desarrollo)** como para **perfiles de negocio y no técnicos (Product Managers, Stakeholders, Gerencia)**.
 
+### 🌟 1. Informe Ejecutivo en Español (Recomendado para Negocio y QA)
+
+Genera un dashboard visual, moderno y 100% en español que incluye:
+- **Resumen Ejecutivo (KPIs):** Tasa de éxito global (%), pruebas aprobadas, fallidas, omitidas y duración total.
+- **Matriz de Cobertura Regional con Banderas Oficiales SVG:** Indicadores de salud en tiempo real por país (🇦🇷 AR, 🇧🇷 BR, 🇨🇱 CL, 🇨🇴 CO, 🇪🇨 EC, 🇻🇪 VE) y por canal (🛵 Delivery, 🛍️ Pickup).
+- **Paso a Paso Visual con Capturas (Screenshots):** Cada prueba muestra la cronología de pasos de negocio con su duración, estado y **fotografía de evidencia** en alta resolución.
+- **Visor Lightbox Integrado:** Haz clic en cualquier captura para verla en pantalla completa, hacer zoom y navegar con flechas paso a paso como una galería secuencial.
+- **Reproductor de Video Embebido:** Visualiza el video completo de la navegación directamente en el informe sin necesidad de abrir archivos locales.
+- **Explicación Amigable de Errores:** En caso de fallos, explica el motivo en lenguaje natural claro (ej: local cerrado, lentitud de red), manteniendo una sección técnica colapsable para desarrolladores.
+- **Filtros Dinámicos y Búsqueda:** Filtra por país, canal, resultado y busca por texto al instante.
+- **Exportación a PDF / Imprimir:** Botón optimizado para generar minutas o reportes ejecutivos listos para compartir.
+
+Para abrir el **Informe Ejecutivo** tras ejecutar tus pruebas:
 ```bash
-npx playwright show-report
+npm run report:ejecutivo
 ```
+*(O abre directamente el archivo `playwright-report/informe-ejecutivo.html` en cualquier navegador).*
 
+---
+
+### 🔧 2. Informe Técnico Nativo de Playwright
+
+Para inspeccionar trazas profundas, árbol de red y detalles de bajo nivel:
+```bash
+npm run report:tecnico
+```
+*(O mediante `npx playwright show-report playwright-report/tecnico`).*

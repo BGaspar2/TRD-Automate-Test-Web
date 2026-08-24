@@ -1,7 +1,8 @@
 import { test } from '@playwright/test';
+import { ejecutarPaso } from '../utils/pasos.js';
 
-// Configurar ejecución secuencial (serial)
-test.describe.configure({ mode: 'serial' });
+// Las pruebas se ejecutan secuencialmente de forma independiente (con --workers=1)
+// permitiendo que si un país falla, la ejecución continúe con los siguientes países.
 
 // 🇦🇷 ARGENTINA
 import { testData as testDataAR } from './argentina/data/testData.js';
@@ -47,252 +48,468 @@ import { CheckoutPage as CheckoutPageVE } from './venezuela/pages/CheckoutPage.j
 
 test.describe('Suite Regional LATAM - Flujo Compra Anónima (AR, BR, CL, CO, EC, VE)', () => {
 
-    test('🇦🇷 Argentina - Compra en Pickup usuario anónimo', async ({ page }) => {
+    test('🇦🇷 Argentina - Compra en Pickup usuario anónimo', async ({ page }, testInfo) => {
         const homePage = new HomePageAR(page);
         const menuPage = new MenuPageAR(page);
         const cartPage = new CartPageAR(page);
         const checkoutPage = new CheckoutPageAR(page);
 
-        await homePage.navegar(testDataAR.baseUrl);
-        await homePage.seleccionarCanalPickup(testDataAR.location.searchQuery, testDataAR.location.fullAddress);
+        await ejecutarPaso(page, testInfo, {
+            numero: 1,
+            titulo: 'Navegación y Selección de Tienda Pickup',
+            descripcion: 'Ingreso al sitio web de KFC Argentina y selección de sucursal para retiro'
+        }, async () => {
+            await homePage.navegar(testDataAR.baseUrl);
+            await homePage.seleccionarCanalPickup(testDataAR.location.searchQuery, testDataAR.location.fullAddress);
+        });
 
-        await menuPage.seleccionarCategoriaAleatoria();
-        await menuPage.seleccionarProductoAleatorio();
-        await menuPage.ajustarCantidad(testDataAR.order.desiredQuantity);
-        await menuPage.validarYSeleccionarModificadores();
-        await menuPage.agregarAlCarrito(testDataAR.order.desiredQuantity);
+        await ejecutarPaso(page, testInfo, {
+            numero: 2,
+            titulo: 'Selección de Menú y Personalización de Producto',
+            descripcion: 'Elección de categoría, producto aleatorio, modificadores y agregado al pedido'
+        }, async () => {
+            await menuPage.seleccionarCategoriaAleatoria();
+            await menuPage.seleccionarProductoAleatorio();
+            await menuPage.ajustarCantidad(testDataAR.order.desiredQuantity);
+            await menuPage.validarYSeleccionarModificadores();
+            await menuPage.agregarAlCarrito(testDataAR.order.desiredQuantity);
+        });
 
-        await cartPage.procesarModalCarrito();
-        await cartPage.validarYAjustarMontoCarrito();
-        await cartPage.irAPagar();
+        await ejecutarPaso(page, testInfo, {
+            numero: 3,
+            titulo: 'Revisión y Validación del Carrito de Compras',
+            descripcion: 'Verificación de montos mínimos/máximos y avance a pagar'
+        }, async () => {
+            await cartPage.procesarModalCarrito();
+            await cartPage.validarYAjustarMontoCarrito();
+            await cartPage.irAPagar();
+        });
 
-        await checkoutPage.iniciarCompletar();
-        await checkoutPage.llenarDatosPersonales(testDataAR.customer);
-        await checkoutPage.seleccionarMetodoPago(testDataAR.paymentMethodId);
+        await ejecutarPaso(page, testInfo, {
+            numero: 4,
+            titulo: 'Datos de Facturación y Selección de Pago',
+            descripcion: 'Ingreso de datos del cliente y método de pago en Argentina'
+        }, async () => {
+            await checkoutPage.iniciarCompletar();
+            await checkoutPage.llenarDatosPersonales(testDataAR.customer);
+            await checkoutPage.seleccionarMetodoPago(testDataAR.paymentMethodId);
+        });
 
         console.log("Flujo Argentina finalizado con éxito.");
         await page.waitForTimeout(3000);
     });
 
-    test('🇧🇷 Brasil - Compra en Pickup usuario anónimo', async ({ page }) => {
+    test('🇧🇷 Brasil - Compra en Pickup usuario anónimo', async ({ page }, testInfo) => {
         const homePage = new HomePageBR(page);
         const menuPage = new MenuPageBR(page);
         const cartPage = new CartPageBR(page);
         const checkoutPage = new CheckoutPageBR(page);
 
-        await homePage.navegar(testDataBR.baseUrl);
-        await homePage.seleccionarCanalPickup(testDataBR.location.searchQuery, testDataBR.location.fullAddress);
+        await ejecutarPaso(page, testInfo, {
+            numero: 1,
+            titulo: 'Navegação e Seleção de Loja Pickup',
+            descripcion: 'Acesso ao KFC Brasil e seleção da loja física para retirada'
+        }, async () => {
+            await homePage.navegar(testDataBR.baseUrl);
+            await homePage.seleccionarCanalPickup(testDataBR.location.searchQuery, testDataBR.location.fullAddress);
+        });
 
-        await menuPage.seleccionarCategoriaAleatoria();
-        await menuPage.seleccionarProductoAleatorio();
-        await menuPage.ajustarCantidad(testDataBR.order.desiredQuantity);
-        await menuPage.validarYSeleccionarModificadores();
-        await menuPage.agregarAlCarrito(testDataBR.order.desiredQuantity);
+        await ejecutarPaso(page, testInfo, {
+            numero: 2,
+            titulo: 'Seleção do Menu e Personalização do Produto',
+            descripcion: 'Escolha de categoria, produto, modificadores e adição ao carrinho'
+        }, async () => {
+            await menuPage.seleccionarCategoriaAleatoria();
+            await menuPage.seleccionarProductoAleatorio();
+            await menuPage.ajustarCantidad(testDataBR.order.desiredQuantity);
+            await menuPage.validarYSeleccionarModificadores();
+            await menuPage.agregarAlCarrito(testDataBR.order.desiredQuantity);
+        });
 
-        await cartPage.procesarModalCarrito();
-        await cartPage.validarYAjustarMontoCarrito();
-        await cartPage.irAPagar();
+        await ejecutarPaso(page, testInfo, {
+            numero: 3,
+            titulo: 'Revisão e Validação do Carrinho',
+            descripcion: 'Verificação de regras de montante e prosseguimento ao pagamento'
+        }, async () => {
+            await cartPage.procesarModalCarrito();
+            await cartPage.validarYAjustarMontoCarrito();
+            await cartPage.irAPagar();
+        });
 
-        await checkoutPage.iniciarCompletar();
-        await checkoutPage.llenarDatosPersonales(testDataBR.customer);
-        await checkoutPage.seleccionarMetodoPago(testDataBR.paymentMethodId);
+        await ejecutarPaso(page, testInfo, {
+            numero: 4,
+            titulo: 'Dados Pessoais e Forma de Pagamento',
+            descripcion: 'Preenchimento dos dados do cliente e seleção de pagamento no Brasil'
+        }, async () => {
+            await checkoutPage.iniciarCompletar();
+            await checkoutPage.llenarDatosPersonales(testDataBR.customer);
+            await checkoutPage.seleccionarMetodoPago(testDataBR.paymentMethodId);
+        });
 
         console.log("Flujo Brasil finalizado con éxito.");
         await page.waitForTimeout(3000);
     });
 
-    test('🇪🇨 Ecuador - Compra en Pickup usuario anónimo', async ({ page }) => {
+    test('🇪🇨 Ecuador - Compra en Pickup usuario anónimo', async ({ page }, testInfo) => {
         const homePage = new HomePageEC(page);
         const menuPage = new MenuPageEC(page);
         const cartPage = new CartPageEC(page);
         const checkoutPage = new CheckoutPageEC(page);
 
-        await homePage.navegar(testDataEC.baseUrl);
-        await homePage.seleccionarCanalPickup(testDataEC.location.searchQuery, testDataEC.location.fullAddress);
+        await ejecutarPaso(page, testInfo, {
+            numero: 1,
+            titulo: 'Navegación y Selección de Tienda Pickup',
+            descripcion: 'Ingreso al sitio web de KFC Ecuador y selección de local para retiro'
+        }, async () => {
+            await homePage.navegar(testDataEC.baseUrl);
+            await homePage.seleccionarCanalPickup(testDataEC.location.searchQuery, testDataEC.location.fullAddress);
+        });
 
-        await menuPage.seleccionarCategoriaAleatoria();
-        await menuPage.seleccionarProductoAleatorio();
-        await menuPage.ajustarCantidad(testDataEC.order.desiredQuantity);
-        await menuPage.validarYSeleccionarModificadores();
-        await menuPage.agregarAlCarrito(testDataEC.order.desiredQuantity);
+        await ejecutarPaso(page, testInfo, {
+            numero: 2,
+            titulo: 'Selección de Menú y Personalización de Producto',
+            descripcion: 'Elección de categoría, producto aleatorio, modificadores y agregado al pedido'
+        }, async () => {
+            await menuPage.seleccionarCategoriaAleatoria();
+            await menuPage.seleccionarProductoAleatorio();
+            await menuPage.ajustarCantidad(testDataEC.order.desiredQuantity);
+            await menuPage.validarYSeleccionarModificadores();
+            await menuPage.agregarAlCarrito(testDataEC.order.desiredQuantity);
+        });
 
-        await cartPage.procesarModalCarrito();
-        await cartPage.validarYAjustarMontoCarrito();
-        await cartPage.irAPagar();
+        await ejecutarPaso(page, testInfo, {
+            numero: 3,
+            titulo: 'Revisión y Validación del Carrito de Compras',
+            descripcion: 'Verificación de montos mínimos/máximos y avance a pagar'
+        }, async () => {
+            await cartPage.procesarModalCarrito();
+            await cartPage.validarYAjustarMontoCarrito();
+            await cartPage.irAPagar();
+        });
 
-        await checkoutPage.iniciarCompletar();
-        await checkoutPage.llenarDatosPersonales(testDataEC.customer);
-        await checkoutPage.seleccionarMetodoPago(testDataEC.paymentMethodId);
+        await ejecutarPaso(page, testInfo, {
+            numero: 4,
+            titulo: 'Datos de Facturación y Selección de Pago',
+            descripcion: 'Ingreso de datos de contacto y selección de método de pago'
+        }, async () => {
+            await checkoutPage.iniciarCompletar();
+            await checkoutPage.llenarDatosPersonales(testDataEC.customer);
+            await checkoutPage.seleccionarMetodoPago(testDataEC.paymentMethodId);
+        });
 
         console.log("Flujo Ecuador Pickup finalizado con éxito.");
         await page.waitForTimeout(3000);
     });
 
-    test('🇪🇨 Ecuador - Compra a domicilio usuario anónimo', async ({ page }) => {
+    test('🇪🇨 Ecuador - Compra a domicilio usuario anónimo', async ({ page }, testInfo) => {
         const homePage = new HomePageEC(page);
         const menuPage = new MenuPageEC(page);
         const cartPage = new CartPageEC(page);
         const checkoutPage = new CheckoutPageEC(page);
 
-        await homePage.navegar(testDataEC.baseUrl);
-        await homePage.seleccionarCanalDomicilio();
-        await homePage.configurarUbicacion(testDataEC.location.searchQuery, testDataEC.location.fullAddress);
+        await ejecutarPaso(page, testInfo, {
+            numero: 1,
+            titulo: 'Navegación y Configuración de Dirección Delivery',
+            descripcion: 'Ingreso a KFC Ecuador y selección de dirección de entrega'
+        }, async () => {
+            await homePage.navegar(testDataEC.baseUrl);
+            await homePage.seleccionarCanalDomicilio();
+            await homePage.configurarUbicacion(testDataEC.location.searchQuery, testDataEC.location.fullAddress);
+        });
 
-        await menuPage.seleccionarCategoriaAleatoria();
-        await menuPage.seleccionarProductoAleatorio();
-        await menuPage.ajustarCantidad(testDataEC.order.desiredQuantity);
-        await menuPage.validarYSeleccionarModificadores();
-        await menuPage.agregarAlCarrito(testDataEC.order.desiredQuantity);
+        await ejecutarPaso(page, testInfo, {
+            numero: 2,
+            titulo: 'Selección de Menú y Personalización de Producto',
+            descripcion: 'Elección de categoría, producto aleatorio, modificadores y agregado al pedido'
+        }, async () => {
+            await menuPage.seleccionarCategoriaAleatoria();
+            await menuPage.seleccionarProductoAleatorio();
+            await menuPage.ajustarCantidad(testDataEC.order.desiredQuantity);
+            await menuPage.validarYSeleccionarModificadores();
+            await menuPage.agregarAlCarrito(testDataEC.order.desiredQuantity);
+        });
 
-        await cartPage.procesarModalCarrito();
-        await cartPage.validarYAjustarMontoCarrito();
-        await cartPage.irAPagar();
+        await ejecutarPaso(page, testInfo, {
+            numero: 3,
+            titulo: 'Revisión y Validación del Carrito de Compras',
+            descripcion: 'Verificación de montos mínimos/máximos y avance a pagar'
+        }, async () => {
+            await cartPage.procesarModalCarrito();
+            await cartPage.validarYAjustarMontoCarrito();
+            await cartPage.irAPagar();
+        });
 
-        await checkoutPage.iniciarCompletar();
-        await checkoutPage.llenarDireccionEntrega(testDataEC.deliveryAddress);
-        await checkoutPage.llenarDatosPersonales(testDataEC.customer);
-        await checkoutPage.seleccionarMetodoPago(testDataEC.paymentMethodId);
+        await ejecutarPaso(page, testInfo, {
+            numero: 4,
+            titulo: 'Dirección de Entrega, Datos Personales y Pago',
+            descripcion: 'Ingreso de datos de entrega y selección de método de pago'
+        }, async () => {
+            await checkoutPage.iniciarCompletar();
+            await checkoutPage.llenarDireccionEntrega(testDataEC.deliveryAddress);
+            await checkoutPage.llenarDatosPersonales(testDataEC.customer);
+            await checkoutPage.seleccionarMetodoPago(testDataEC.paymentMethodId);
+        });
 
         console.log("Flujo Ecuador Delivery finalizado con éxito.");
         await page.waitForTimeout(3000);
     });
 
-    test('🇨🇱 Chile - Compra en Pickup usuario anónimo', async ({ page }) => {
+    test('🇨🇱 Chile - Compra en Pickup usuario anónimo', async ({ page }, testInfo) => {
         const homePage = new HomePageCL(page);
         const menuPage = new MenuPageCL(page);
         const cartPage = new CartPageCL(page);
         const checkoutPage = new CheckoutPageCL(page);
 
-        await homePage.navegar(testDataCL.baseUrl);
-        await homePage.seleccionarCanalPickup(testDataCL.location.searchQuery, testDataCL.location.fullAddress);
+        await ejecutarPaso(page, testInfo, {
+            numero: 1,
+            titulo: 'Navegación y Selección de Tienda Pickup',
+            descripcion: 'Ingreso a KFC Chile y selección de local para retiro en tienda'
+        }, async () => {
+            await homePage.navegar(testDataCL.baseUrl);
+            await homePage.seleccionarCanalPickup(testDataCL.location.searchQuery, testDataCL.location.fullAddress);
+        });
 
-        await menuPage.seleccionarCategoriaAleatoria();
-        await menuPage.seleccionarProductoAleatorio();
-        await menuPage.ajustarCantidad(testDataCL.order.desiredQuantity);
-        await menuPage.validarYSeleccionarModificadores();
-        await menuPage.agregarAlCarrito(testDataCL.order.desiredQuantity);
+        await ejecutarPaso(page, testInfo, {
+            numero: 2,
+            titulo: 'Selección de Menú y Personalización de Producto',
+            descripcion: 'Elección de categoría, producto aleatorio, modificadores y agregado al pedido'
+        }, async () => {
+            await menuPage.seleccionarCategoriaAleatoria();
+            await menuPage.seleccionarProductoAleatorio();
+            await menuPage.ajustarCantidad(testDataCL.order.desiredQuantity);
+            await menuPage.validarYSeleccionarModificadores();
+            await menuPage.agregarAlCarrito(testDataCL.order.desiredQuantity);
+        });
 
-        await cartPage.procesarModalCarrito();
-        await cartPage.validarYAjustarMontoCarrito();
-        await cartPage.irAPagar();
+        await ejecutarPaso(page, testInfo, {
+            numero: 3,
+            titulo: 'Revisión y Validación del Carrito de Compras',
+            descripcion: 'Verificación de montos mínimos/máximos y avance a pagar'
+        }, async () => {
+            await cartPage.procesarModalCarrito();
+            await cartPage.validarYAjustarMontoCarrito();
+            await cartPage.irAPagar();
+        });
 
-        await checkoutPage.iniciarCompletar();
-        await checkoutPage.llenarDatosPersonales(testDataCL.customer);
-        await checkoutPage.seleccionarMetodoPago(testDataCL.paymentMethodId);
+        await ejecutarPaso(page, testInfo, {
+            numero: 4,
+            titulo: 'Datos de Facturación y Selección de Pago',
+            descripcion: 'Ingreso de datos de contacto y selección de método de pago en Chile'
+        }, async () => {
+            await checkoutPage.iniciarCompletar();
+            await checkoutPage.llenarDatosPersonales(testDataCL.customer);
+            await checkoutPage.seleccionarMetodoPago(testDataCL.paymentMethodId);
+        });
 
         console.log("Flujo Chile Pickup finalizado con éxito.");
         await page.waitForTimeout(3000);
     });
 
-    test('🇨🇱 Chile - Compra a domicilio usuario anónimo', async ({ page }) => {
+    test('🇨🇱 Chile - Compra a domicilio usuario anónimo', async ({ page }, testInfo) => {
         const homePage = new HomePageCL(page);
         const menuPage = new MenuPageCL(page);
         const cartPage = new CartPageCL(page);
         const checkoutPage = new CheckoutPageCL(page);
 
-        await homePage.navegar(testDataCL.baseUrl);
-        await homePage.seleccionarCanalDomicilio();
-        await homePage.configurarUbicacion(testDataCL.location.searchQuery, testDataCL.location.fullAddress);
+        await ejecutarPaso(page, testInfo, {
+            numero: 1,
+            titulo: 'Navegación y Configuración de Dirección Delivery',
+            descripcion: 'Ingreso a KFC Chile y selección de dirección de entrega'
+        }, async () => {
+            await homePage.navegar(testDataCL.baseUrl);
+            await homePage.seleccionarCanalDomicilio();
+            await homePage.configurarUbicacion(testDataCL.location.searchQuery, testDataCL.location.fullAddress);
+        });
 
-        await menuPage.seleccionarCategoriaAleatoria();
-        await menuPage.seleccionarProductoAleatorio();
-        await menuPage.ajustarCantidad(testDataCL.order.desiredQuantity);
-        await menuPage.validarYSeleccionarModificadores();
-        await menuPage.agregarAlCarrito(testDataCL.order.desiredQuantity);
+        await ejecutarPaso(page, testInfo, {
+            numero: 2,
+            titulo: 'Selección de Menú y Personalización de Producto',
+            descripcion: 'Elección de categoría, producto aleatorio, modificadores y agregado al pedido'
+        }, async () => {
+            await menuPage.seleccionarCategoriaAleatoria();
+            await menuPage.seleccionarProductoAleatorio();
+            await menuPage.ajustarCantidad(testDataCL.order.desiredQuantity);
+            await menuPage.validarYSeleccionarModificadores();
+            await menuPage.agregarAlCarrito(testDataCL.order.desiredQuantity);
+        });
 
-        await cartPage.procesarModalCarrito();
-        await cartPage.validarYAjustarMontoCarrito();
-        await cartPage.irAPagar();
+        await ejecutarPaso(page, testInfo, {
+            numero: 3,
+            titulo: 'Revisión y Validación del Carrito de Compras',
+            descripcion: 'Verificación de montos mínimos/máximos y avance a pagar'
+        }, async () => {
+            await cartPage.procesarModalCarrito();
+            await cartPage.validarYAjustarMontoCarrito();
+            await cartPage.irAPagar();
+        });
 
-        await checkoutPage.iniciarCompletar();
-        await checkoutPage.llenarDireccionEntrega(testDataCL.deliveryAddress);
-        await checkoutPage.llenarDatosPersonales(testDataCL.customer);
-        await checkoutPage.seleccionarMetodoPago(testDataCL.paymentMethodId);
+        await ejecutarPaso(page, testInfo, {
+            numero: 4,
+            titulo: 'Dirección de Entrega, Datos Personales y Pago',
+            descripcion: 'Ingreso de dirección de entrega, datos del cliente y método de pago'
+        }, async () => {
+            await checkoutPage.iniciarCompletar();
+            await checkoutPage.llenarDireccionEntrega(testDataCL.deliveryAddress);
+            await checkoutPage.llenarDatosPersonales(testDataCL.customer);
+            await checkoutPage.seleccionarMetodoPago(testDataCL.paymentMethodId);
+        });
 
         console.log("Flujo Chile Delivery finalizado con éxito.");
         await page.waitForTimeout(3000);
     });
 
-    test('🇨🇴 Colombia - Compra en Pickup usuario anónimo', async ({ page }) => {
+    test('🇨🇴 Colombia - Compra en Pickup usuario anónimo', async ({ page }, testInfo) => {
         const homePage = new HomePageCO(page);
         const menuPage = new MenuPageCO(page);
         const cartPage = new CartPageCO(page);
         const checkoutPage = new CheckoutPageCO(page);
 
-        await homePage.navegar(testDataCO.baseUrl);
-        await homePage.seleccionarCanalPickup(testDataCO.location.searchQuery, testDataCO.location.fullAddress);
+        await ejecutarPaso(page, testInfo, {
+            numero: 1,
+            titulo: 'Navegación y Selección de Tienda Pickup',
+            descripcion: 'Ingreso a KFC Colombia y selección de tienda para retiro'
+        }, async () => {
+            await homePage.navegar(testDataCO.baseUrl);
+            await homePage.seleccionarCanalPickup(testDataCO.location.searchQuery, testDataCO.location.fullAddress);
+        });
 
-        await menuPage.seleccionarCategoriaAleatoria();
-        await menuPage.seleccionarProductoAleatorio();
-        await menuPage.ajustarCantidad(testDataCO.order.desiredQuantity);
-        await menuPage.validarYSeleccionarModificadores();
-        await menuPage.agregarAlCarrito(testDataCO.order.desiredQuantity);
+        await ejecutarPaso(page, testInfo, {
+            numero: 2,
+            titulo: 'Selección de Menú y Personalización de Producto',
+            descripcion: 'Elección de categoría, producto aleatorio, modificadores y agregado al pedido'
+        }, async () => {
+            await menuPage.seleccionarCategoriaAleatoria();
+            await menuPage.seleccionarProductoAleatorio();
+            await menuPage.ajustarCantidad(testDataCO.order.desiredQuantity);
+            await menuPage.validarYSeleccionarModificadores();
+            await menuPage.agregarAlCarrito(testDataCO.order.desiredQuantity);
+        });
 
-        await cartPage.procesarModalCarrito();
-        await cartPage.validarYAjustarMontoCarrito();
-        await cartPage.irAPagar();
+        await ejecutarPaso(page, testInfo, {
+            numero: 3,
+            titulo: 'Revisión y Validación del Carrito de Compras',
+            descripcion: 'Verificación de montos mínimos/máximos y avance a pagar'
+        }, async () => {
+            await cartPage.procesarModalCarrito();
+            await cartPage.validarYAjustarMontoCarrito();
+            await cartPage.irAPagar();
+        });
 
-        await checkoutPage.iniciarCompletar();
-        await checkoutPage.llenarDatosPersonales(testDataCO.customer);
-        await checkoutPage.seleccionarMetodoPago(testDataCO.paymentMethodId);
+        await ejecutarPaso(page, testInfo, {
+            numero: 4,
+            titulo: 'Datos de Facturación y Selección de Pago',
+            descripcion: 'Ingreso de datos de contacto y selección de método de pago en Colombia'
+        }, async () => {
+            await checkoutPage.iniciarCompletar();
+            await checkoutPage.llenarDatosPersonales(testDataCO.customer);
+            await checkoutPage.seleccionarMetodoPago(testDataCO.paymentMethodId);
+        });
 
         console.log("Flujo Colombia Pickup finalizado con éxito.");
         await page.waitForTimeout(3000);
     });
 
-    test('🇨🇴 Colombia - Compra a domicilio usuario anónimo', async ({ page }) => {
+    test('🇨🇴 Colombia - Compra a domicilio usuario anónimo', async ({ page }, testInfo) => {
         const homePage = new HomePageCO(page);
         const menuPage = new MenuPageCO(page);
         const cartPage = new CartPageCO(page);
         const checkoutPage = new CheckoutPageCO(page);
 
-        await homePage.navegar(testDataCO.baseUrl);
-        await homePage.seleccionarCanalDomicilio();
-        await homePage.configurarUbicacion(testDataCO.location.searchQuery, testDataCO.location.fullAddress);
+        await ejecutarPaso(page, testInfo, {
+            numero: 1,
+            titulo: 'Navegación y Configuración de Dirección Delivery',
+            descripcion: 'Ingreso a KFC Colombia y selección de dirección de entrega a domicilio'
+        }, async () => {
+            await homePage.navegar(testDataCO.baseUrl);
+            await homePage.seleccionarCanalDomicilio();
+            await homePage.configurarUbicacion(testDataCO.location.searchQuery, testDataCO.location.fullAddress);
+        });
 
-        await menuPage.seleccionarCategoriaAleatoria();
-        await menuPage.seleccionarProductoAleatorio();
-        await menuPage.ajustarCantidad(testDataCO.order.desiredQuantity);
-        await menuPage.validarYSeleccionarModificadores();
-        await menuPage.agregarAlCarrito(testDataCO.order.desiredQuantity);
+        await ejecutarPaso(page, testInfo, {
+            numero: 2,
+            titulo: 'Selección de Menú y Personalización de Producto',
+            descripcion: 'Elección de categoría, producto aleatorio, modificadores y agregado al pedido'
+        }, async () => {
+            await menuPage.seleccionarCategoriaAleatoria();
+            await menuPage.seleccionarProductoAleatorio();
+            await menuPage.ajustarCantidad(testDataCO.order.desiredQuantity);
+            await menuPage.validarYSeleccionarModificadores();
+            await menuPage.agregarAlCarrito(testDataCO.order.desiredQuantity);
+        });
 
-        await cartPage.procesarModalCarrito();
-        await cartPage.validarYAjustarMontoCarrito();
-        await cartPage.irAPagar();
+        await ejecutarPaso(page, testInfo, {
+            numero: 3,
+            titulo: 'Revisión y Validación del Carrito de Compras',
+            descripcion: 'Verificación de montos mínimos/máximos y avance a pagar'
+        }, async () => {
+            await cartPage.procesarModalCarrito();
+            await cartPage.validarYAjustarMontoCarrito();
+            await cartPage.irAPagar();
+        });
 
-        await checkoutPage.iniciarCompletar();
-        await checkoutPage.llenarDireccionEntrega(testDataCO.deliveryAddress);
-        await checkoutPage.llenarDatosPersonales(testDataCO.customer);
-        await checkoutPage.seleccionarMetodoPago(testDataCO.paymentMethodId);
+        await ejecutarPaso(page, testInfo, {
+            numero: 4,
+            titulo: 'Dirección de Entrega, Datos Personales y Pago',
+            descripcion: 'Ingreso de dirección de entrega, datos del cliente y método de pago'
+        }, async () => {
+            await checkoutPage.iniciarCompletar();
+            await checkoutPage.llenarDireccionEntrega(testDataCO.deliveryAddress);
+            await checkoutPage.llenarDatosPersonales(testDataCO.customer);
+            await checkoutPage.seleccionarMetodoPago(testDataCO.paymentMethodId);
+        });
 
         console.log("Flujo Colombia Delivery finalizado con éxito.");
         await page.waitForTimeout(3000);
     });
 
-    test('🇻🇪 Venezuela - Compra a domicilio usuario anónimo', async ({ page }) => {
+    test('🇻🇪 Venezuela - Compra a domicilio usuario anónimo', async ({ page }, testInfo) => {
         const homePage = new HomePageVE(page);
         const menuPage = new MenuPageVE(page);
         const cartPage = new CartPageVE(page);
         const checkoutPage = new CheckoutPageVE(page);
 
-        await homePage.navegar(testDataVE.baseUrl);
-        await homePage.seleccionarCanalDomicilio();
-        await homePage.configurarUbicacion(testDataVE.location.searchQuery, testDataVE.location.fullAddress);
+        await ejecutarPaso(page, testInfo, {
+            numero: 1,
+            titulo: 'Navegación y Configuración de Dirección Delivery',
+            descripcion: 'Ingreso a KFC Venezuela y selección de dirección de entrega a domicilio'
+        }, async () => {
+            await homePage.navegar(testDataVE.baseUrl);
+            await homePage.seleccionarCanalDomicilio();
+            await homePage.configurarUbicacion(testDataVE.location.searchQuery, testDataVE.location.fullAddress);
+        });
 
-        await menuPage.seleccionarCategoriaAleatoria();
-        await menuPage.seleccionarProductoAleatorio();
-        await menuPage.ajustarCantidad(testDataVE.order.desiredQuantity);
-        await menuPage.validarYSeleccionarModificadores();
-        await menuPage.agregarAlCarrito(testDataVE.order.desiredQuantity);
+        await ejecutarPaso(page, testInfo, {
+            numero: 2,
+            titulo: 'Selección de Menú y Personalización de Producto',
+            descripcion: 'Elección de categoría, producto aleatorio, modificadores y agregado al pedido'
+        }, async () => {
+            await menuPage.seleccionarCategoriaAleatoria();
+            await menuPage.seleccionarProductoAleatorio();
+            await menuPage.ajustarCantidad(testDataVE.order.desiredQuantity);
+            await menuPage.validarYSeleccionarModificadores();
+            await menuPage.agregarAlCarrito(testDataVE.order.desiredQuantity);
+        });
 
-        await cartPage.procesarModalCarrito();
-        await cartPage.validarYAjustarMontoCarrito();
-        await cartPage.irAPagar();
+        await ejecutarPaso(page, testInfo, {
+            numero: 3,
+            titulo: 'Revisión y Validación del Carrito de Compras',
+            descripcion: 'Verificación de montos mínimos/máximos y avance a pagar'
+        }, async () => {
+            await cartPage.procesarModalCarrito();
+            await cartPage.validarYAjustarMontoCarrito();
+            await cartPage.irAPagar();
+        });
 
-        await checkoutPage.iniciarCompletar();
-        await checkoutPage.llenarDireccionEntrega(testDataVE.deliveryAddress);
-        await checkoutPage.llenarDatosPersonales(testDataVE.customer);
-        await checkoutPage.seleccionarMetodoPago(testDataVE.paymentMethodId);
+        await ejecutarPaso(page, testInfo, {
+            numero: 4,
+            titulo: 'Dirección de Entrega, Datos Personales y Pago',
+            descripcion: 'Ingreso de dirección de entrega, datos del cliente y método de pago'
+        }, async () => {
+            await checkoutPage.iniciarCompletar();
+            await checkoutPage.llenarDireccionEntrega(testDataVE.deliveryAddress);
+            await checkoutPage.llenarDatosPersonales(testDataVE.customer);
+            await checkoutPage.seleccionarMetodoPago(testDataVE.paymentMethodId);
+        });
 
         console.log("Flujo Venezuela finalizado con éxito.");
         await page.waitForTimeout(3000);
