@@ -465,6 +465,36 @@ export class CheckoutPage {
         await this.page.locator('.Modal, [role="dialog"]').first().waitFor({ state: 'hidden', timeout: 8000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
         console.log("✅ Proceso de adición de tarjeta finalizado en Chile.");
+
+        // 7. Llenar CVV externo en la página principal si está presente
+        await this.llenarCvvExternoSiAplica(cardData.cvv || '123');
+    }
+
+    /**
+     * Llena el campo de CVV que aparece debajo de la tarjeta seleccionada en la pantalla principal
+     * @param {string} cvv
+     */
+    async llenarCvvExternoSiAplica(cvv = '123') {
+        const cvvValor = String(cvv || '123');
+        console.log(`Verificando campo de CVV externo en checkout principal: "${cvvValor}"...`);
+        const inputCvvAfuera = this.page.locator('input[placeholder*="012" i], input[placeholder*="CVV" i], input[placeholder*="000" i], input[name*="cvv" i], input[name*="cvc" i], input[id*="cvv" i]')
+            .or(this.page.locator('div:has-text("CVV") input, label:has-text("CVV") input, div:has-text("Ingresa el CVV") input, label:has-text("Ingresa el CVV") input').first())
+            .first();
+
+        if (await inputCvvAfuera.isVisible({ timeout: 3500 }).catch(() => false)) {
+            console.log(`Llenando CVV externo en el checkout principal: "${cvvValor}"...`);
+            await inputCvvAfuera.scrollIntoViewIfNeeded().catch(() => {});
+            await inputCvvAfuera.click();
+            await inputCvvAfuera.fill('');
+            await inputCvvAfuera.pressSequentially(cvvValor, { delay: 50 });
+            await inputCvvAfuera.evaluate((inp, v) => {
+                inp.value = v;
+                inp.dispatchEvent(new Event('input', { bubbles: true }));
+                inp.dispatchEvent(new Event('change', { bubbles: true }));
+                inp.dispatchEvent(new Event('blur', { bubbles: true }));
+            }, cvvValor).catch(() => {});
+            console.log("✅ CVV externo completado con éxito.");
+        }
     }
 
     /**
@@ -663,6 +693,7 @@ export class CheckoutPage {
         console.log("Iniciando procesamiento de pago y confirmación de orden en Chile...");
 
         await this.asegurarDatosFacturacion();
+        await this.llenarCvvExternoSiAplica('123');
 
         let codigoDetectado = null;
 
