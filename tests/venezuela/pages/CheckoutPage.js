@@ -214,48 +214,116 @@ export class CheckoutPage {
     }
 
     /**
-     * Selecciona el método de pago en Venezuela ('Punto De Venta' o 'Efectivo')
-     * @param {string} metodoPago - 'Punto de venta' | 'Efectivo (con cambio)' | 'Tarjeta'
-     * @param {string} [montoCambio] - Monto para cambio
+     * Selecciona el método de pago en Venezuela:
+     * - 'Punto de venta'
+     * - 'Efectivo (Monto exacto)' / 'Efectivo' (con switch de valor total)
+     * - 'Efectivo (Con cambio)' (con monto mayor al total ingresado en el input)
+     * @param {'punto_venta' | 'efectivo_exacto' | 'efectivo_cambio' | string} metodoPago
+     * @param {string|number} [montoCambio]
      */
-    async seleccionarMetodoPago(metodoPago = 'Punto de venta', montoCambio = '20') {
-        const textoBusqueda = metodoPago.toLowerCase().includes('punto') ? 'Punto De Venta'
-            : metodoPago.toLowerCase().includes('efectivo') ? 'Efectivo'
-            : metodoPago.toLowerCase().includes('tarjeta') ? 'Tarjeta'
-            : metodoPago;
+    async seleccionarMetodoPago(metodoPago = 'Punto de venta', montoCambio = null) {
+        const metodoLower = (metodoPago || '').toLowerCase();
+        const esPuntoVenta = metodoLower.includes('punto') || metodoLower === 'pos';
+        const esEfectivoCambio = metodoLower.includes('cambio') || metodoLower === 'efectivo_cambio';
+        const esEfectivoExacto = !esPuntoVenta && !esEfectivoCambio; // Por defecto si es solo 'efectivo' o 'exacto'
 
-        console.log(`Seleccionando método de pago en Venezuela: "${textoBusqueda}"...`);
+        if (esPuntoVenta) {
+            console.log('Seleccionando método de pago: "Punto De Venta"...');
+            const radioPunto = this.page.locator('label, [role="radio"], div, span')
+                .filter({ hasText: /^Punto De Venta$/i })
+                .or(this.page.getByRole('radio', { name: /punto de venta/i }))
+                .or(this.page.locator('label:has-text("Punto De Venta")'));
 
-        // 1. Localizar el radio button / label en la sección de 'Método de pago'
-        const radioPago = this.page.locator('label, [role="radio"], div, span')
-            .filter({ hasText: new RegExp(`^\\s*${textoBusqueda.replace(/[()]/g, '\\$&')}\\s*$`, 'i') })
-            .or(this.page.getByRole('radio', { name: new RegExp(textoBusqueda, 'i') }))
-            .or(this.page.locator('label').filter({ hasText: new RegExp(textoBusqueda, 'i') }))
-            .or(this.page.locator(`input[value*="${textoBusqueda}"], [id*="${textoBusqueda}"]`));
+            const opcion = radioPunto.first();
+            await opcion.waitFor({ state: 'visible', timeout: 8000 });
+            await opcion.click({ force: true }).catch(async () => {
+                await opcion.evaluate(el => el.click());
+            });
+            console.log('✅ Opción "Punto De Venta" seleccionada.');
+        } else {
+            // Es Efectivo (Exacto o Con Cambio)
+            console.log('Seleccionando método de pago: "Efectivo"...');
+            const radioEfectivo = this.page.locator('label, [role="radio"], div, span')
+                .filter({ hasText: /^Efectivo$/i })
+                .or(this.page.getByRole('radio', { name: /^efectivo$/i }))
+                .or(this.page.locator('label:has-text("Efectivo")'));
 
-        const opcion = radioPago.first();
-        await opcion.waitFor({ state: 'visible', timeout: 8000 });
-        await opcion.scrollIntoViewIfNeeded().catch(() => {});
-        
-        await opcion.click({ force: true }).catch(async () => {
-            await opcion.evaluate(el => el.click());
-        });
-        console.log(`✅ Opción "${textoBusqueda}" seleccionada.`);
-        await this.page.waitForTimeout(1500);
+            const opcion = radioEfectivo.first();
+            await opcion.waitFor({ state: 'visible', timeout: 8000 });
+            await opcion.click({ force: true }).catch(async () => {
+                await opcion.evaluate(el => el.click());
+            });
+            console.log('✅ Opción "Efectivo" seleccionada.');
+            await this.page.waitForTimeout(1500);
 
-        // 2. Si es Efectivo con cambio, llenar el monto si se solicita
-        if (metodoPago.toLowerCase().includes('cambio') || metodoPago.toLowerCase().includes('efectivo')) {
-            const inputCambio = this.page.locator('input[name*="change"], input[name*="cambio"], input[name*="cash"], input[placeholder*="cambio"], input[placeholder*="con cuánto"], #change, #cashAmount').first();
-            if (await inputCambio.isVisible({ timeout: 2000 }).catch(() => false)) {
-                console.log(`Llenando monto para cambio: "${montoCambio}"`);
-                await inputCambio.click();
-                await inputCambio.fill(montoCambio);
-                await inputCambio.evaluate(el => el.dispatchEvent(new Event('change', { bubbles: true }))).catch(() => {});
+            // Localizador del Switch de 'Pagar con valor total / Monto exacto'
+            const switchValorTotal = this.page.locator('input[type="checkbox"], [role="switch"], .Switch, [class*="switch"], [class*="Toggle"], [class*="checkbox"]')
+                .or(this.page.locator('label, div').filter({ hasText: /valor total|monto exacto|total exacto|pago total|monto a pagar/i }).locator('input, [role="switch"]'))
+                .or(this.page.locator('label').filter({ hasText: /valor total|monto exacto|total exacto|pago total/i }));
+
+            const switchEl = switchValorTotal.first();
+
+            if (esEfectivoExacto) {
+                console.log('Configurando Efectivo con valor total (monto exacto)...');
+                if (await switchEl.isVisible({ timeout: 3000 }).catch(() => false)) {
+                    const isChecked = await switchEl.isChecked().catch(() => false);
+                    if (!isChecked) {
+                        console.log('Activando switch de valor total...');
+                        await switchEl.click({ force: true }).catch(async () => {
+                            await switchEl.evaluate(el => el.click());
+                        });
+                    }
+                    console.log('✅ Switch de valor total activo.');
+                }
+            } else if (esEfectivoCambio) {
+                console.log('Configurando Efectivo con cambio (monto mayor)...');
+                // Si el switch está encendido, apagarlo para habilitar el input
+                if (await switchEl.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    const isChecked = await switchEl.isChecked().catch(() => false);
+                    if (isChecked) {
+                        console.log('Desactivando switch de valor total para habilitar input de cambio...');
+                        await switchEl.click({ force: true }).catch(async () => {
+                            await switchEl.evaluate(el => el.click());
+                        });
+                    }
+                }
                 await this.page.waitForTimeout(1000);
+
+                // Calcular monto mayor a la cantidad a pagar
+                let montoADar = montoCambio || '50';
+                
+                // Intentar leer el total de la orden en pantalla
+                const totalElement = this.page.locator('.OrderSummary, [class*="Total"], [class*="total"], strong, span')
+                    .filter({ hasText: /\$\s*\d+|\b\d+[.,]\d{2}\b/ }).last();
+                if (await totalElement.isVisible({ timeout: 1500 }).catch(() => false)) {
+                    const totalText = await totalElement.innerText().catch(() => '');
+                    const matchNum = totalText.match(/(\d+[.,]\d{2}|\d+)/);
+                    if (matchNum) {
+                        const totalNum = parseFloat(matchNum[1].replace(',', '.'));
+                        if (!isNaN(totalNum) && totalNum > 0) {
+                            montoADar = String(Math.ceil(totalNum + 10)); // Mayor a la orden
+                        }
+                    }
+                }
+
+                // Llenar el input con el monto
+                const inputMonto = this.page.locator('input[name*="change"], input[name*="amount"], input[name*="cash"], input[placeholder*="monto"], input[placeholder*="cambio"], input[type="number"], input[placeholder*="¿Con cuánto"], input[placeholder*="con cuanto"]').first()
+                    .or(this.page.locator('.PaymentMethods input[type="text"], [class*="Payment"] input[type="text"], input[type="text"]').last());
+
+                if (await inputMonto.isVisible({ timeout: 3000 }).catch(() => false)) {
+                    console.log(`Llenando monto que se va a pagar (mayor al total): "$${montoADar}"`);
+                    await inputMonto.click();
+                    await inputMonto.fill(montoADar);
+                    await inputMonto.evaluate(el => {
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                    }).catch(() => {});
+                    console.log(`✅ Monto de pago "$${montoADar}" configurado.`);
+                }
             }
         }
 
-        await this.page.waitForTimeout(1000);
+        await this.page.waitForTimeout(1500);
     }
 
     /**

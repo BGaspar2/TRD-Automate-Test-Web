@@ -6,7 +6,13 @@ import { CartPage } from '../pages/CartPage.js';
 import { CheckoutPage } from '../pages/CheckoutPage.js';
 import { ejecutarPaso } from '../../../utils/pasos.js';
 
-test('Flujo E2E - Compra a domicilio con Pago y Generación de Orden (Venezuela)', async ({ page }, testInfo) => {
+/**
+ * Función base que ejecuta el flujo completo de Delivery en Venezuela con el método de pago especificado
+ * @param {import('@playwright/test').Page} page
+ * @param {import('@playwright/test').TestInfo} testInfo
+ * @param {'Punto de Venta' | 'Efectivo (Monto Exacto)' | 'Efectivo (Con Cambio)'} metodoPago
+ */
+async function ejecutarFlujoDeliveryVenezuela(page, testInfo, metodoPago) {
     test.setTimeout(180000);
 
     const homePage = new HomePage(page);
@@ -66,10 +72,16 @@ test('Flujo E2E - Compra a domicilio con Pago y Generación de Orden (Venezuela)
     await ejecutarPaso(page, testInfo, {
         numero: 5,
         titulo: 'Método de Pago, Procesamiento y Detalle de la Orden',
-        descripcion: `Selección de '${testData.paymentMethod}', procesamiento de pago, validación de éxito y captura de número de orden`
+        descripcion: `Selección de '${metodoPago}', procesamiento de pago y captura de número de orden`
     }, async () => {
-        await checkoutPage.seleccionarMetodoPago(testData.paymentMethod, testData.montoCambio);
+        await checkoutPage.seleccionarMetodoPago(metodoPago, testData.montoCambio);
         codigoPedidoGenerado = await checkoutPage.procesarPagoYConfirmarOrden();
+
+        // Registrar metadatos en el informe ejecutivo
+        testInfo.annotations.push({
+            type: 'Método de Pago',
+            description: metodoPago
+        });
 
         if (codigoPedidoGenerado) {
             testInfo.annotations.push({
@@ -77,11 +89,27 @@ test('Flujo E2E - Compra a domicilio con Pago y Generación de Orden (Venezuela)
                 description: codigoPedidoGenerado
             });
             await testInfo.attach('📋 Código de Pedido Confirmado', {
-                body: `Código de Pedido: ${codigoPedidoGenerado}`,
+                body: `Código de Pedido: ${codigoPedidoGenerado}\nMétodo de Pago: ${metodoPago}`,
                 contentType: 'text/plain'
             });
         }
     });
 
-    console.log(`✅ Flujo Venezuela Delivery finalizado exitosamente. Orden: [ ${codigoPedidoGenerado} ]`);
+    console.log(`✅ Flujo Venezuela Delivery (${metodoPago}) finalizado exitosamente. Orden: [ ${codigoPedidoGenerado} ]`);
+}
+
+// =========================================================================
+// 🇻🇪 Casos de Prueba E2E - Métodos de Pago Venezuela
+// =========================================================================
+
+test('Flujo E2E - Compra Delivery con Punto de Venta (Venezuela)', async ({ page }, testInfo) => {
+    await ejecutarFlujoDeliveryVenezuela(page, testInfo, testData.paymentMethods.puntoDeVenta);
+});
+
+test('Flujo E2E - Compra Delivery con Efectivo (Monto Exacto) (Venezuela)', async ({ page }, testInfo) => {
+    await ejecutarFlujoDeliveryVenezuela(page, testInfo, testData.paymentMethods.efectivoExacto);
+});
+
+test('Flujo E2E - Compra Delivery con Efectivo (Con Cambio) (Venezuela)', async ({ page }, testInfo) => {
+    await ejecutarFlujoDeliveryVenezuela(page, testInfo, testData.paymentMethods.efectivoCambio);
 });

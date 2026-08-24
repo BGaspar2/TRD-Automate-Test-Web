@@ -228,6 +228,24 @@ class SpanishExecutiveReporter {
             }
         }
 
+        // Extraer Método de Pago si existe en anotaciones o título
+        let metodoPago = null;
+        if (test.annotations && test.annotations.length > 0) {
+            const annPago = test.annotations.find(a => a.type.toLowerCase().includes('pago') || a.type.toLowerCase().includes('payment') || a.type.toLowerCase().includes('método'));
+            if (annPago && annPago.description) {
+                metodoPago = annPago.description;
+            }
+        }
+        if (!metodoPago) {
+            if (lowerTitle.includes('punto de venta') || lowerTitle.includes('pos')) {
+                metodoPago = 'Punto de Venta';
+            } else if (lowerTitle.includes('con cambio') || lowerTitle.includes('cambio')) {
+                metodoPago = 'Efectivo (Con Cambio)';
+            } else if (lowerTitle.includes('monto exacto') || lowerTitle.includes('exacto') || lowerTitle.includes('efectivo')) {
+                metodoPago = 'Efectivo (Monto Exacto)';
+            }
+        }
+
         this.tests.push({
             id: test.id,
             title: test.title,
@@ -239,6 +257,7 @@ class SpanishExecutiveReporter {
             iconoCanal,
             tipoUsuario,
             codigoPedido,
+            metodoPago,
             duration: result.duration,
             status: result.status,
             estadoEspanol,
@@ -1234,6 +1253,7 @@ class SpanishExecutiveReporter {
                             <span class="tag tag-country">${t.pais}</span>
                             <span class="tag tag-channel">${t.iconoCanal} ${t.canal}</span>
                             <span class="tag tag-user">👤 ${t.tipoUsuario}</span>
+                            ${t.metodoPago ? `<span class="tag tag-payment" style="background: #0284c7; color: white; font-weight: 700; border-radius: 6px; padding: 4px 10px; font-size: 12px; letter-spacing: 0.3px; box-shadow: 0 1px 3px rgba(2,132,199,0.3);">💳 ${t.metodoPago}</span>` : ''}
                             ${t.codigoPedido ? `<span class="tag tag-order" style="background: #e4002b; color: white; font-weight: 700; border-radius: 6px; padding: 4px 10px; font-size: 13px; letter-spacing: 0.5px; box-shadow: 0 1px 3px rgba(228,0,43,0.3);">🧾 Orden: ${t.codigoPedido}</span>` : ''}
                         </div>
                         <div class="test-meta">
@@ -1251,6 +1271,7 @@ class SpanishExecutiveReporter {
                                     <div>
                                         <div style="font-size: 12px; font-weight: 700; color: #991b1b; text-transform: uppercase; letter-spacing: 0.5px;">Número de Pedido Confirmado</div>
                                         <div style="font-size: 20px; font-weight: 800; color: #b91c1c; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">${t.codigoPedido}</div>
+                                        ${t.metodoPago ? `<div style="font-size: 13px; color: #7f1d1d; margin-top: 4px; font-weight: 600;">💳 Método de Pago: <span style="font-weight: 700; color: #991b1b;">${t.metodoPago}</span></div>` : ''}
                                     </div>
                                 </div>
                                 <div style="background: #fee2e2; color: #991b1b; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; border: 1px solid #fca5a5;">✨ Estado: Pedido Creado y Registrado</div>
