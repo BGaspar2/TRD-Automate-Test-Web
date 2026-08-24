@@ -367,10 +367,9 @@ export class CheckoutPage {
             scope = this.page.locator('.PaymentMethods, [class*="PaymentMethod"], [class*="payment" i]').last();
         }
 
+        // 1. Número de Tarjeta
         console.log(`Ingresando número de tarjeta en el modal: ${cardData.number}...`);
-        // Número de Tarjeta (dentro del scope estricto)
-        const inputNumero = scope.locator('input[name*="number" i], input[name*="card" i], input[placeholder*="número" i], input[placeholder*="numero" i], input[id*="card" i], input[autocomplete*="cc-number" i], input[type="tel"]').first();
-
+        const inputNumero = scope.locator('input[placeholder*="número" i], input[placeholder*="numero" i], input[name*="number" i], input[name*="card" i], input[id*="card" i], input[autocomplete*="cc-number" i]').first();
         if (await inputNumero.isVisible({ timeout: 5000 }).catch(() => false)) {
             await inputNumero.click();
             await inputNumero.fill(cardData.numberClean || cardData.number);
@@ -378,98 +377,83 @@ export class CheckoutPage {
                 el.value = v;
                 el.dispatchEvent(new Event('input', { bubbles: true }));
                 el.dispatchEvent(new Event('change', { bubbles: true }));
+                el.dispatchEvent(new Event('blur', { bubbles: true }));
             }, cardData.numberClean || cardData.number).catch(() => {});
         }
 
-        // Nombre del Titular (dentro del scope estricto)
-        console.log(`Ingresando titular: "${cardData.name}"...`);
-        const inputTitular = scope.locator('input[name*="holder" i], input[name*="name" i], input[placeholder*="titular" i], input[placeholder*="nombre" i], input[id*="holder" i], input[autocomplete*="cc-name" i]').first();
-        if (await inputTitular.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await inputTitular.click();
-            await inputTitular.fill(cardData.name);
-            await inputTitular.evaluate((el, v) => {
-                el.value = v;
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-            }, cardData.name).catch(() => {});
-        }
-
-        // Fecha de Expiración (Mes / Año o MM/AA dentro del scope estricto)
-        const anioAEnviar = String(cardData.expiryFullYear || cardData.expiryYear || '2030');
+        // 2. Mes de expiración (Placeholder MM o contenedor Mes)
         const mesAEnviar = String(cardData.expiryMonth || '01');
+        console.log(`Ingresando Mes de expiración: "${mesAEnviar}"...`);
+        const inputMes = scope.locator('input[placeholder="MM"], input[placeholder*="MM" i], input[name*="month" i], input[id*="month" i]').first()
+            .or(scope.locator('div:has-text("Mes") input, label:has-text("Mes") input').first());
 
-        console.log(`Ingresando fecha de expiración: Mes="${mesAEnviar}", Año="${anioAEnviar}"...`);
-        const inputExpiry = scope.locator('input[name*="exp" i], input[placeholder*="MM/AA" i], input[placeholder*="MM/YY" i], input[placeholder*="vencimiento" i], input[id*="exp" i]').first();
-        if (await inputExpiry.isVisible({ timeout: 1500 }).catch(() => false)) {
-            await inputExpiry.click();
-            await inputExpiry.fill(cardData.expiry || `${mesAEnviar}/${anioAEnviar.slice(-2)}`);
-            await inputExpiry.evaluate((el, v) => {
+        if (await inputMes.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await inputMes.click();
+            await inputMes.fill(mesAEnviar);
+            await inputMes.evaluate((el, v) => {
                 el.value = v;
                 el.dispatchEvent(new Event('input', { bubbles: true }));
                 el.dispatchEvent(new Event('change', { bubbles: true }));
-            }, cardData.expiry || `${mesAEnviar}/${anioAEnviar.slice(-2)}`).catch(() => {});
-        } else {
-            // Inputs separados de Mes y Año (4 dígitos)
-            const inputMes = scope.locator('input[name*="month" i], select[name*="month" i], input[placeholder*="mes" i], input[placeholder*="MM" i], input[id*="month" i]').first()
-                .or(scope.locator('label:has-text("Mes") input, div:has-text("Mes") input').first());
-            
-            const inputAnio = scope.locator('input[name*="year" i], select[name*="year" i], input[placeholder*="año" i], input[placeholder*="ano" i], input[placeholder*="AAAA" i], input[placeholder*="YYYY" i], input[id*="year" i]').first()
-                .or(scope.locator('label:has-text("Año") input, div:has-text("Año") input, label:has-text("Ano") input').first());
-
-            if (await inputMes.isVisible({ timeout: 1500 }).catch(() => false)) {
-                console.log(`Llenando Mes de expiración: "${mesAEnviar}"`);
-                await inputMes.click();
-                await inputMes.fill(mesAEnviar);
-                await inputMes.evaluate((el, v) => {
-                    el.value = v;
-                    el.dispatchEvent(new Event('input', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                }, mesAEnviar).catch(() => {});
-            }
-
-            if (await inputAnio.isVisible({ timeout: 1500 }).catch(() => false)) {
-                console.log(`Llenando Año de expiración (4 caracteres): "${anioAEnviar}"`);
-                await inputAnio.click();
-                await inputAnio.fill(anioAEnviar);
-                await inputAnio.evaluate((el, v) => {
-                    el.value = v;
-                    el.dispatchEvent(new Event('input', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                    el.dispatchEvent(new Event('blur', { bubbles: true }));
-                }, anioAEnviar).catch(() => {});
-            }
+                el.dispatchEvent(new Event('blur', { bubbles: true }));
+            }, mesAEnviar).catch(() => {});
         }
 
-        // Código de Seguridad CVV (dentro del scope estricto)
-        console.log(`Ingresando código de seguridad CVV: "${cardData.cvv}"...`);
-        const inputCvv = scope.locator('input[name*="cvv" i], input[name*="cvc" i], input[name*="code" i], input[placeholder*="CVV" i], input[placeholder*="CVC" i], input[placeholder*="seguridad" i], input[id*="cvv" i]').first();
-        if (await inputCvv.isVisible({ timeout: 2000 }).catch(() => false)) {
+        // 3. Año de expiración (Placeholder YYYY o contenedor Año de expiración)
+        const anioAEnviar = String(cardData.expiryFullYear || cardData.expiryYear || '2030');
+        console.log(`Ingresando Año de expiración (YYYY): "${anioAEnviar}"...`);
+        const inputAnio = scope.locator('input[placeholder="YYYY"], input[placeholder*="YYYY" i], input[name*="year" i], input[id*="year" i]').first()
+            .or(scope.locator('div:has-text("Año") input, label:has-text("Año") input, div:has-text("Ano") input').first());
+
+        if (await inputAnio.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await inputAnio.click();
+            await inputAnio.fill(anioAEnviar);
+            await inputAnio.evaluate((el, v) => {
+                el.value = v;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                el.dispatchEvent(new Event('blur', { bubbles: true }));
+            }, anioAEnviar).catch(() => {});
+        }
+
+        // 4. Código de Seguridad CVV
+        const cvvAEnviar = String(cardData.cvv || '123');
+        console.log(`Ingresando código de seguridad CVV: "${cvvAEnviar}"...`);
+        const inputCvv = scope.locator('input[placeholder*="CVV" i], input[placeholder*="CVC" i], input[name*="cvv" i], input[name*="cvc" i], input[placeholder*="seguridad" i], input[id*="cvv" i]').first()
+            .or(scope.locator('div:has-text("Código de seguridad") input, label:has-text("Código de seguridad") input, div:has-text("CVV") input').first());
+
+        if (await inputCvv.isVisible({ timeout: 3000 }).catch(() => false)) {
             await inputCvv.click();
-            await inputCvv.fill(cardData.cvv);
+            await inputCvv.fill(cvvAEnviar);
             await inputCvv.evaluate((el, v) => {
                 el.value = v;
                 el.dispatchEvent(new Event('input', { bubbles: true }));
                 el.dispatchEvent(new Event('change', { bubbles: true }));
-            }, cardData.cvv).catch(() => {});
+                el.dispatchEvent(new Event('blur', { bubbles: true }));
+            }, cvvAEnviar).catch(() => {});
         }
 
-        // Documento de Identidad (solo si está dentro del modal)
-        if (cardData.document && (tieneModal || iframeCard)) {
-            const inputDoc = scope.locator('input[name*="doc" i], input[name*="identification" i], input[placeholder*="documento" i], input[placeholder*="cédula" i], input[placeholder*="cedula" i], input[id*="doc" i]').first();
-            if (await inputDoc.isVisible({ timeout: 1500 }).catch(() => false)) {
-                console.log(`Ingresando documento en modal de tarjeta: "${cardData.document}"...`);
-                await inputDoc.click();
-                await inputDoc.fill(cardData.document);
+        // 5. Checkbox "Utilizar mismos datos de la compra" (asegurar que esté marcado)
+        const checkMismosDatos = scope.locator('input[type="checkbox"], [role="checkbox"], label').filter({ hasText: /utilizar mismos datos/i }).first();
+        if (await checkMismosDatos.isVisible({ timeout: 2000 }).catch(() => false)) {
+            const isChecked = await checkMismosDatos.evaluate(el => {
+                const inp = el.querySelector('input[type="checkbox"]') || (el.tagName === 'INPUT' ? el : null);
+                return inp ? inp.checked : el.classList.contains('active') || el.classList.contains('checked');
+            }).catch(() => true);
+
+            if (!isChecked) {
+                console.log("Marcando casilla 'Utilizar mismos datos de la compra'...");
+                await checkMismosDatos.click({ force: true }).catch(() => {});
             }
         }
 
         await this.page.waitForTimeout(1000);
 
-        // 3. Guardar / Confirmar Tarjeta en el Modal
+        // 6. Guardar Tarjeta en el Modal (botón rojo 'Guardar tarjeta')
         console.log("Guardando tarjeta...");
-        const btnGuardarTarjeta = scope.locator('button[type="submit"], button')
-            .filter({ hasText: /guardar|agregar|confirmar|añadir|continuar|salvar/i })
-            .last();
+        const btnGuardarTarjeta = scope.locator('button')
+            .filter({ hasText: /guardar tarjeta|guardar|confirmar/i })
+            .first()
+            .or(scope.locator('button[type="submit"]').first());
 
         if (await btnGuardarTarjeta.isVisible({ timeout: 3000 }).catch(() => false)) {
             await btnGuardarTarjeta.click({ force: true }).catch(async () => {
