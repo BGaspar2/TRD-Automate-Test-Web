@@ -281,10 +281,12 @@ export class CheckoutPage {
         console.log("Iniciando proceso para agregar nueva tarjeta...");
 
         // 1. Localizar y hacer clic en el botón negro '➕ Nueva tarjeta'
-        for (let intento = 1; intento <= 4; intento++) {
-            const btnNuevaTarjeta = this.page.locator('button, [role="button"], div, span, a')
-                .filter({ hasText: /nueva tarjeta/i })
-                .last();
+        for (let intento = 1; intento <= 5; intento++) {
+            // Localizar el elemento <button> o contenedor directo
+            const btnNuevaTarjeta = this.page.getByRole('button', { name: /nueva tarjeta/i })
+                .or(this.page.locator('button').filter({ hasText: /nueva tarjeta/i }))
+                .or(this.page.locator('[class*="button" i], [role="button"], div, a').filter({ hasText: /nueva tarjeta/i }))
+                .first();
 
             if (await btnNuevaTarjeta.isVisible({ timeout: 3000 }).catch(() => false)) {
                 console.log(`Intento ${intento}: Haciendo clic en el botón '➕ Nueva tarjeta'...`);
@@ -295,27 +297,43 @@ export class CheckoutPage {
                     await this.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2).catch(() => {});
                 }
                 
-                await btnNuevaTarjeta.click({ force: true }).catch(() => {});
+                await btnNuevaTarjeta.click().catch(async () => {
+                    await btnNuevaTarjeta.click({ force: true });
+                });
             }
 
-            // Disparo en React Props y DOM
-            await this.page.evaluate(() => {
+            // Disparo integral en DOM y React Props/Fiber
+            const clickInfo = await this.page.evaluate(() => {
                 const all = Array.from(document.querySelectorAll('*'));
-                const target = all.reverse().find(el => /nueva tarjeta/i.test((el.innerText || el.textContent || '').trim()) && (el.innerText || '').length < 30);
-                if (target) {
-                    let p = target;
-                    for (let i = 0; i < 4; i++) {
-                        if (!p) break;
-                        p.click();
-                        p.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-                        const rKey = Object.keys(p).find(k => k.startsWith('__reactProps'));
-                        if (rKey && p[rKey]?.onClick) p[rKey].onClick({ preventDefault: () => {}, stopPropagation: () => {} });
-                        p = p.parentElement;
+                const candidates = all.filter(el => /nueva tarjeta/i.test((el.innerText || el.textContent || '').trim()) && (el.innerText || '').length < 35);
+                
+                for (const el of candidates) {
+                    const btn = el.closest('button') || el.closest('[role="button"]') || el.closest('a') || el;
+                    const rect = btn.getBoundingClientRect();
+                    if (rect.width > 0 && rect.height > 0) {
+                        btn.focus?.();
+                        btn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, view: window }));
+                        btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                        btn.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, view: window }));
+                        btn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                        btn.click?.();
+
+                        const rKey = Object.keys(btn).find(k => k.startsWith('__reactProps'));
+                        if (rKey && btn[rKey]?.onClick) {
+                            btn[rKey].onClick({ preventDefault: () => {}, stopPropagation: () => {}, target: btn, currentTarget: btn });
+                        }
+                        return { found: true, tag: btn.tagName, rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } };
                     }
                 }
-            }).catch(() => {});
+                return { found: false };
+            }).catch(() => null);
 
-            await this.page.waitForTimeout(1500);
+            if (clickInfo?.found && clickInfo.rect) {
+                await this.page.mouse.click(clickInfo.rect.x + clickInfo.rect.w / 2, clickInfo.rect.y + clickInfo.rect.h / 2).catch(() => {});
+            }
+
+            await this.page.waitForTimeout(2000);
 
             // Verificar si el modal ya abrió
             const modalAbierto = await this.page.locator('.Modal, [role="dialog"], [class*="modal" i], [class*="dialog" i], [class*="drawer" i]').first().isVisible({ timeout: 1000 }).catch(() => false);
