@@ -395,24 +395,48 @@ export class CheckoutPage {
         }
 
         // Fecha de Expiración (Mes / Año o MM/AA dentro del scope estricto)
-        console.log(`Ingresando fecha de expiración: "${cardData.expiry}"...`);
+        const anioAEnviar = String(cardData.expiryFullYear || cardData.expiryYear || '2030');
+        const mesAEnviar = String(cardData.expiryMonth || '01');
+
+        console.log(`Ingresando fecha de expiración: Mes="${mesAEnviar}", Año="${anioAEnviar}"...`);
         const inputExpiry = scope.locator('input[name*="exp" i], input[placeholder*="MM/AA" i], input[placeholder*="MM/YY" i], input[placeholder*="vencimiento" i], input[id*="exp" i]').first();
-        if (await inputExpiry.isVisible({ timeout: 2000 }).catch(() => false)) {
+        if (await inputExpiry.isVisible({ timeout: 1500 }).catch(() => false)) {
             await inputExpiry.click();
-            await inputExpiry.fill(cardData.expiry || '01/30');
+            await inputExpiry.fill(cardData.expiry || `${mesAEnviar}/${anioAEnviar.slice(-2)}`);
             await inputExpiry.evaluate((el, v) => {
                 el.value = v;
                 el.dispatchEvent(new Event('input', { bubbles: true }));
                 el.dispatchEvent(new Event('change', { bubbles: true }));
-            }, cardData.expiry || '01/30').catch(() => {});
+            }, cardData.expiry || `${mesAEnviar}/${anioAEnviar.slice(-2)}`).catch(() => {});
         } else {
-            const inputMes = scope.locator('input[name*="month" i], select[name*="month" i], input[placeholder*="MM" i]').first();
-            const inputAnio = scope.locator('input[name*="year" i], select[name*="year" i], input[placeholder*="AA" i], input[placeholder*="YY" i]').first();
+            // Inputs separados de Mes y Año (4 dígitos)
+            const inputMes = scope.locator('input[name*="month" i], select[name*="month" i], input[placeholder*="mes" i], input[placeholder*="MM" i], input[id*="month" i]').first()
+                .or(scope.locator('label:has-text("Mes") input, div:has-text("Mes") input').first());
+            
+            const inputAnio = scope.locator('input[name*="year" i], select[name*="year" i], input[placeholder*="año" i], input[placeholder*="ano" i], input[placeholder*="AAAA" i], input[placeholder*="YYYY" i], input[id*="year" i]').first()
+                .or(scope.locator('label:has-text("Año") input, div:has-text("Año") input, label:has-text("Ano") input').first());
+
             if (await inputMes.isVisible({ timeout: 1500 }).catch(() => false)) {
-                await inputMes.fill(cardData.expiryMonth || '01');
+                console.log(`Llenando Mes de expiración: "${mesAEnviar}"`);
+                await inputMes.click();
+                await inputMes.fill(mesAEnviar);
+                await inputMes.evaluate((el, v) => {
+                    el.value = v;
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                }, mesAEnviar).catch(() => {});
             }
+
             if (await inputAnio.isVisible({ timeout: 1500 }).catch(() => false)) {
-                await inputAnio.fill(cardData.expiryYear || '30');
+                console.log(`Llenando Año de expiración (4 caracteres): "${anioAEnviar}"`);
+                await inputAnio.click();
+                await inputAnio.fill(anioAEnviar);
+                await inputAnio.evaluate((el, v) => {
+                    el.value = v;
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    el.dispatchEvent(new Event('blur', { bubbles: true }));
+                }, anioAEnviar).catch(() => {});
             }
         }
 
