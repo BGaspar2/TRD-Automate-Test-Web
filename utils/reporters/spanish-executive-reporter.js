@@ -210,6 +210,24 @@ class SpanishExecutiveReporter {
             }
         }
 
+        // Extraer Código de Pedido si existe en anotaciones o pasos
+        let codigoPedido = null;
+        if (test.annotations && test.annotations.length > 0) {
+            const ann = test.annotations.find(a => a.type.toLowerCase().includes('pedido') || a.type.toLowerCase().includes('orden') || a.type.toLowerCase().includes('order'));
+            if (ann && ann.description) {
+                codigoPedido = ann.description;
+            }
+        }
+        if (!codigoPedido && steps.length > 0) {
+            for (const s of steps) {
+                const match = s.title.match(/\[\s*([0-9A-Za-z-]+)\s*\]/);
+                if (match && match[1] && match[1].length >= 4) {
+                    codigoPedido = match[1];
+                    break;
+                }
+            }
+        }
+
         this.tests.push({
             id: test.id,
             title: test.title,
@@ -220,6 +238,7 @@ class SpanishExecutiveReporter {
             canal,
             iconoCanal,
             tipoUsuario,
+            codigoPedido,
             duration: result.duration,
             status: result.status,
             estadoEspanol,
@@ -1215,6 +1234,7 @@ class SpanishExecutiveReporter {
                             <span class="tag tag-country">${t.pais}</span>
                             <span class="tag tag-channel">${t.iconoCanal} ${t.canal}</span>
                             <span class="tag tag-user">👤 ${t.tipoUsuario}</span>
+                            ${t.codigoPedido ? `<span class="tag tag-order" style="background: #e4002b; color: white; font-weight: 700; border-radius: 6px; padding: 4px 10px; font-size: 13px; letter-spacing: 0.5px; box-shadow: 0 1px 3px rgba(228,0,43,0.3);">🧾 Orden: ${t.codigoPedido}</span>` : ''}
                         </div>
                         <div class="test-meta">
                             <span class="test-duration">⏱️ ${this.formatearDuracion(t.duration)}</span>
@@ -1224,6 +1244,19 @@ class SpanishExecutiveReporter {
                     </div>
 
                     <div class="test-content">
+                        ${t.codigoPedido ? `
+                            <div class="order-summary-box" style="background: linear-gradient(135deg, #fff5f5 0%, #fef2f2 100%); border: 1px solid #fecaca; border-left: 5px solid #e4002b; border-radius: 12px; padding: 18px 24px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.04);">
+                                <div style="display: flex; align-items: center; gap: 14px;">
+                                    <div style="background: #fee2e2; width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px;">🧾</div>
+                                    <div>
+                                        <div style="font-size: 12px; font-weight: 700; color: #991b1b; text-transform: uppercase; letter-spacing: 0.5px;">Número de Pedido Confirmado</div>
+                                        <div style="font-size: 20px; font-weight: 800; color: #b91c1c; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">${t.codigoPedido}</div>
+                                    </div>
+                                </div>
+                                <div style="background: #fee2e2; color: #991b1b; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; border: 1px solid #fca5a5;">✨ Estado: Pedido Creado y Registrado</div>
+                            </div>
+                        ` : ''}
+
                         ${t.errorAmigable ? `
                             <div class="error-box">
                                 <div class="error-title">⚠️ Motivo del fallo (Explicación para Negocio):</div>

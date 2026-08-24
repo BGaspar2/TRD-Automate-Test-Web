@@ -70,6 +70,17 @@ test('Flujo E2E - Compra a domicilio con Pago y Generación de Orden (Venezuela)
     }, async () => {
         await checkoutPage.seleccionarMetodoPago(testData.paymentMethod, testData.montoCambio);
         codigoPedidoGenerado = await checkoutPage.procesarPagoYConfirmarOrden();
+
+        if (codigoPedidoGenerado) {
+            testInfo.annotations.push({
+                type: 'Código de Pedido',
+                description: codigoPedidoGenerado
+            });
+            await testInfo.attach('📋 Código de Pedido Confirmado', {
+                body: `Código de Pedido: ${codigoPedidoGenerado}`,
+                contentType: 'text/plain'
+            });
+        }
     });
 
     console.log(`✅ Flujo Venezuela Delivery finalizado exitosamente. Orden: [ ${codigoPedidoGenerado} ]`);

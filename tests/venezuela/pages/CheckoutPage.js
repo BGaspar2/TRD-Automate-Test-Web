@@ -300,8 +300,13 @@ export class CheckoutPage {
             console.log("Aviso: Esperando renderizado de la tarjeta de pedido...");
         });
 
-        // Pausa breve para estabilización del contenido dinámico
-        await this.page.waitForTimeout(3000);
+        // Scroll para enfocar y centrar la tarjeta de pedido en la pantalla (Lugar de entrega, Restaurante, Código de pedido)
+        console.log("Haciendo scroll para centrar la tarjeta de pedido en pantalla...");
+        await labelCodigoPedido.first().scrollIntoViewIfNeeded().catch(() => {});
+        await this.page.evaluate(() => {
+            window.scrollBy({ top: 150, behavior: 'smooth' });
+        });
+        await this.page.waitForTimeout(2000);
 
         // 5. Extraer el valor exacto del código de pedido (ej. '0000002961-013401')
         console.log("Extrayendo código de pedido de la pantalla de detalle...");
