@@ -10,7 +10,7 @@ import { ejecutarPaso } from '../../../utils/pasos.js';
  * Función base que ejecuta el flujo completo de Delivery en Ecuador con el método de pago especificado
  * @param {import('@playwright/test').Page} page
  * @param {import('@playwright/test').TestInfo} testInfo
- * @param {'Datáfono' | 'Efectivo (Monto Exacto)' | 'Efectivo (Con Cambio)'} metodoPago
+ * @param {'Punto de Venta' | 'Efectivo (Monto Exacto)' | 'Efectivo (Con Cambio)'} metodoPago
  */
 async function ejecutarFlujoDeliveryEcuador(page, testInfo, metodoPago) {
     test.setTimeout(180000);
@@ -102,8 +102,8 @@ async function ejecutarFlujoDeliveryEcuador(page, testInfo, metodoPago) {
 // 🇪🇨 Casos de Prueba E2E - Métodos de Pago Ecuador
 // =========================================================================
 
-test('Flujo E2E - Compra Delivery con Datáfono (Ecuador)', async ({ page }, testInfo) => {
-    await ejecutarFlujoDeliveryEcuador(page, testInfo, testData.paymentMethods.datafono);
+test('Flujo E2E - Compra Delivery con Punto de Venta (Ecuador)', async ({ page }, testInfo) => {
+    await ejecutarFlujoDeliveryEcuador(page, testInfo, testData.paymentMethods.puntoDeVenta);
 });
 
 test('Flujo E2E - Compra Delivery con Efectivo (Monto Exacto) (Ecuador)', async ({ page }, testInfo) => {

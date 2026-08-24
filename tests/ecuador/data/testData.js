@@ -23,7 +23,7 @@ export const testData = {
         document: "1712345678"
     },
     paymentMethods: {
-        datafono: "Datáfono",
+        puntoDeVenta: "Punto de Venta",
         efectivoExacto: "Efectivo (Monto Exacto)",
         efectivoCambio: "Efectivo (Con Cambio)"
     },
