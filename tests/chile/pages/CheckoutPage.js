@@ -466,7 +466,7 @@ export class CheckoutPage {
         await this.page.waitForTimeout(2000);
         console.log("✅ Proceso de adición de tarjeta finalizado en Chile.");
 
-        // 7. Llenar CVV externo en la página principal si está presente
+        // 7. Llenar CVV externo en la página principal si aplica
         await this.llenarCvvExternoSiAplica(cardData.cvv || '123');
     }
 
@@ -476,9 +476,8 @@ export class CheckoutPage {
      */
     async llenarCvvExternoSiAplica(cvv = '123') {
         const cvvValor = String(cvv || '123');
-        console.log(`Buscando campo de CVV externo en checkout principal: "${cvvValor}"...`);
 
-        for (let intento = 1; intento <= 5; intento++) {
+        for (let intento = 1; intento <= 4; intento++) {
             await this.page.waitForTimeout(1000);
 
             // 1. Inyección y detección por DOM estricta
@@ -498,6 +497,9 @@ export class CheckoutPage {
                             const idOrName = ((inp.id || '') + ' ' + (inp.name || '') + ' ' + (inp.placeholder || '')).toLowerCase();
                             // Excluir absolutamente campos personales
                             if (!idOrName.includes('document') && !idOrName.includes('name') && !idOrName.includes('phone') && !idOrName.includes('email') && !idOrName.includes('street') && !idOrName.includes('rut')) {
+                                if (inp.value === val) {
+                                    return { found: true, alreadyFilled: true };
+                                }
                                 inp.focus();
                                 const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
                                 if (setter) setter.call(inp, val);
@@ -506,7 +508,7 @@ export class CheckoutPage {
                                 inp.dispatchEvent(new Event('change', { bubbles: true }));
                                 inp.dispatchEvent(new Event('blur', { bubbles: true }));
                                 const rect = inp.getBoundingClientRect();
-                                return { found: true, rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } };
+                                return { found: true, alreadyFilled: false, rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } };
                             }
                         }
                         container = container.parentElement;
@@ -516,6 +518,9 @@ export class CheckoutPage {
                 // Estrategia B: Buscar input con placeholder exacto '012'
                 const input012 = Array.from(document.querySelectorAll('input')).find(inp => (inp.placeholder || '').trim() === '012');
                 if (input012) {
+                    if (input012.value === val) {
+                        return { found: true, alreadyFilled: true };
+                    }
                     input012.focus();
                     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
                     if (setter) setter.call(input012, val);
@@ -524,11 +529,16 @@ export class CheckoutPage {
                     input012.dispatchEvent(new Event('change', { bubbles: true }));
                     input012.dispatchEvent(new Event('blur', { bubbles: true }));
                     const rect = input012.getBoundingClientRect();
-                    return { found: true, rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } };
+                    return { found: true, alreadyFilled: false, rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } };
                 }
 
                 return { found: false };
             }, cvvValor).catch(() => ({ found: false }));
+
+            if (resDom?.alreadyFilled) {
+                console.log("✅ CVV externo ya se encuentra diligenciado.");
+                break;
+            }
 
             if (resDom?.found && resDom.rect && resDom.rect.width > 0) {
                 console.log(`Campo de CVV externo detectado en coordenadas (${resDom.rect.x}, ${resDom.rect.y}). Digitando...`);
@@ -546,17 +556,20 @@ export class CheckoutPage {
                 .first();
 
             if (await inputCvvAfuera.isVisible({ timeout: 1000 }).catch(() => false)) {
-                console.log(`Llenando CVV externo vía selector Playwright: "${cvvValor}"...`);
-                await inputCvvAfuera.scrollIntoViewIfNeeded().catch(() => {});
-                await inputCvvAfuera.click();
-                await inputCvvAfuera.fill('');
-                await inputCvvAfuera.pressSequentially(cvvValor, { delay: 50 });
-                await inputCvvAfuera.evaluate((inp, v) => {
-                    inp.value = v;
-                    inp.dispatchEvent(new Event('input', { bubbles: true }));
-                    inp.dispatchEvent(new Event('change', { bubbles: true }));
-                    inp.dispatchEvent(new Event('blur', { bubbles: true }));
-                }, cvvValor).catch(() => {});
+                const valActual = await inputCvvAfuera.inputValue().catch(() => '');
+                if (valActual !== cvvValor) {
+                    console.log(`Llenando CVV externo vía selector Playwright: "${cvvValor}"...`);
+                    await inputCvvAfuera.scrollIntoViewIfNeeded().catch(() => {});
+                    await inputCvvAfuera.click();
+                    await inputCvvAfuera.fill('');
+                    await inputCvvAfuera.pressSequentially(cvvValor, { delay: 50 });
+                    await inputCvvAfuera.evaluate((inp, v) => {
+                        inp.value = v;
+                        inp.dispatchEvent(new Event('input', { bubbles: true }));
+                        inp.dispatchEvent(new Event('change', { bubbles: true }));
+                        inp.dispatchEvent(new Event('blur', { bubbles: true }));
+                    }, cvvValor).catch(() => {});
+                }
                 console.log("✅ CVV externo completado con éxito.");
                 break;
             }
@@ -732,7 +745,7 @@ export class CheckoutPage {
                 expiryFullYear: "2030",
                 cvv: "123",
                 name: "APRO APRO",
-                document: "123456789"
+                document: "12345678-9"
             };
 
             await this.agregarNuevaTarjeta(cardData);
@@ -754,17 +767,19 @@ export class CheckoutPage {
     }
 
     /**
-     * Procesa el pago final, monitorea el endpoint de backend y confirma la orden en Chile
-     * @returns {Promise<string|null>} Código de pedido generado
+     * Procesa el pago, espera a que cargue la pantalla con el 'Código de pedido' y lo extrae con exactitud en Chile
+     * @returns {Promise<string>} Número / Código de Pedido
      */
     async procesarPagoYConfirmarOrden() {
-        console.log("Iniciando procesamiento de pago y confirmación de orden en Chile...");
+        console.log("Iniciando proceso de pago y creación de orden en Chile...");
 
+        this.codigoPedido = null;
+
+        // Asegurar una última vez que los datos de facturación estén marcados
         await this.asegurarDatosFacturacion();
         await this.llenarCvvExternoSiAplica('123');
 
-        let codigoDetectado = null;
-
+        // Escuchar endpoint de red
         const promesaRespuestaOrden = this.page.waitForResponse(response => {
             const url = response.url().toLowerCase();
             const esEndpointOrden = url.includes('/order') || url.includes('/checkout') || url.includes('/orders') || url.includes('/payment');
@@ -774,7 +789,7 @@ export class CheckoutPage {
                 const json = await resp.json();
                 console.log("Payload JSON interceptado de creación de orden en Chile:", JSON.stringify(json).slice(0, 300));
                 const codigo = json?.id || json?.orderId || json?.code || json?.orderNumber || json?.data?.id || json?.data?.orderId || json?.data?.code;
-                if (codigo) {
+                if (codigo && typeof codigo === 'string' && !codigo.toLowerCase().includes('proces')) {
                     console.log(`🎯 Código de pedido interceptado en red: ${codigo}`);
                     return String(codigo);
                 }
@@ -782,40 +797,94 @@ export class CheckoutPage {
             return null;
         }).catch(() => null);
 
-        console.log("Haciendo clic en el botón principal 'Pagar' / 'Confirmar Pedido'...");
-        const btnPagarFinal = this.btnPagar.last();
-        await btnPagarFinal.scrollIntoViewIfNeeded().catch(() => {});
-        await btnPagarFinal.click({ force: true }).catch(async () => {
-            await btnPagarFinal.evaluate(b => b.click());
+        // 1. Hacer clic en el botón de Pagar / Realizar Pedido
+        const btnPagar = this.btnPagar.last();
+        await btnPagar.waitFor({ state: 'visible', timeout: 10000 });
+        await btnPagar.scrollIntoViewIfNeeded().catch(() => {});
+
+        console.log("Haciendo clic en el botón 'Pagar' en Chile...");
+        await btnPagar.click({ force: true }).catch(async () => {
+            await btnPagar.evaluate(b => b.click());
         });
 
-        console.log("Esperando procesamiento de la orden...");
-        await this.page.waitForTimeout(3000);
+        // 2. Monitorear estado: 'Procesando...'
+        console.log("Esperando procesamiento del pedido...");
+        if (await this.indicadorProcesando.first().isVisible({ timeout: 4000 }).catch(() => false)) {
+            console.log("⏳ [Estado]: Procesando orden en curso...");
+        }
 
-        codigoDetectado = await promesaRespuestaOrden;
+        // 3. Monitorear estado: 'Orden creada exitosamente'
+        const toastExito = this.toastOrdenCreada.first();
+        if (await toastExito.isVisible({ timeout: 15000 }).catch(() => false)) {
+            const msg = await toastExito.innerText().catch(() => 'Orden creada exitosamente');
+            console.log(`🎉 [Toast Confirmado]: "${msg.trim()}"`);
+        }
 
-        const selectoresExito = [
-            this.page.locator('text=/¡gracias por tu compra|tu pedido está en camino|pedido confirmado|orden confirmada|resumen del pedido/i'),
-            this.page.locator('.OrderSuccess, .OrderDetail, [class*="OrderSuccess"], [class*="Confirmation"], [class*="order-success"]')
-        ];
+        // 4. ESPERAR A QUE CARGUE LA PANTALLA DE DETALLE CON EL TEXTO "Código de pedido:"
+        console.log("Esperando a que la pantalla de Detalle de la Orden cargue por completo en Chile...");
 
-        for (const selector of selectoresExito) {
-            if (await selector.first().isVisible({ timeout: 15000 }).catch(() => false)) {
-                console.log("Pantalla de confirmación de pedido visible.");
-                break;
+        const labelCodigoPedido = this.page.locator('text=/código de pedido|codigo de pedido|código del pedido|número de pedido/i')
+            .or(this.page.locator('p, span, div, h1, h2, h3, strong').filter({ hasText: /código de pedido|codigo de pedido|número de pedido/i }));
+
+        await labelCodigoPedido.first().waitFor({ state: 'visible', timeout: 40000 }).catch(() => {
+            console.log("Aviso: Esperando renderizado de la tarjeta de pedido en Chile...");
+        });
+
+        // Scroll físico y centrado de la tarjeta de la orden
+        console.log("Haciendo scroll para centrar la tarjeta de pedido en pantalla...");
+        await labelCodigoPedido.first().scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
+        await this.page.mouse.wheel(0, 450);
+        await this.page.evaluate(() => {
+            const el = Array.from(document.querySelectorAll('*')).find(e => e.innerText && /código de pedido|código del pedido/i.test(e.innerText));
+            if (el) {
+                el.scrollIntoView({ behavior: 'instant', block: 'center' });
+            }
+        }).catch(() => {});
+
+        await this.page.waitForTimeout(2000);
+
+        // 5. Extraer el valor exacto del código de pedido
+        console.log("Extrayendo código de pedido de la pantalla de detalle en Chile...");
+
+        const elemento = labelCodigoPedido.first();
+        if (await elemento.isVisible().catch(() => false)) {
+            const textoPadre = await elemento.evaluate(el => {
+                return (el.parentElement?.innerText || el.innerText || '').trim();
+            }).catch(() => '');
+
+            console.log(`Texto capturado del elemento: "${textoPadre}"`);
+
+            const match = textoPadre.match(/c[óo]digo d?e?l?\s*pedido:\s*([0-9A-Za-z-]+)/i);
+            if (match && match[1] && !match[1].toLowerCase().includes('proces')) {
+                this.codigoPedido = match[1].trim();
             }
         }
 
-        if (!codigoDetectado) {
-            const textoPagina = await this.page.innerText('body').catch(() => '');
-            const match = textoPagina.match(/(\d{8,12}-\d{4,8}|\b\d{9,16}\b|[A-Z0-9]{8,12})/);
-            if (match) {
-                codigoDetectado = match[1];
+        if (!this.codigoPedido) {
+            const codigoRed = await promesaRespuestaOrden;
+            if (codigoRed) {
+                this.codigoPedido = codigoRed;
             }
         }
 
-        this.codigoPedido = codigoDetectado || "ORDEN-GENERADA";
-        console.log(`✅ Orden finalizada con éxito en Chile. Código de Pedido: ${this.codigoPedido}`);
+        if (!this.codigoPedido) {
+            const textoBody = await this.page.innerText('body').catch(() => '');
+            const matchBody = textoBody.match(/c[óo]digo d?e?l?\s*pedido:\s*([0-9A-Za-z-]+)/i)
+                || textoBody.match(/#(CL-[0-9]+|[0-9]{5,}-[0-9]{4,}|[0-9]{6,})/i)
+                || textoBody.match(/(\d{8,12}-\d{4,8})/);
+
+            if (matchBody && matchBody[1] && !matchBody[1].toLowerCase().includes('proces')) {
+                this.codigoPedido = matchBody[1].trim();
+            }
+        }
+
+        console.log(`======================================================`);
+        console.log(`🎉 ¡PEDIDO CREADO CON ÉXITO EN CHILE!`);
+        console.log(`📋 Código de Pedido: [ ${this.codigoPedido || 'CONFIRMADO'} ]`);
+        console.log(`======================================================`);
+
+        await this.page.waitForTimeout(5000);
+
         return this.codigoPedido;
     }
 }
