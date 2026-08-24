@@ -446,50 +446,107 @@ export class CheckoutPage {
 
             // PASO 2: Seleccionar el Sub-Radio Button 'Débito / Crédito'
             console.log('2. Seleccionando Sub-Radio Button: "Débito / Crédito"...');
-            for (let intento = 1; intento <= 5; intento++) {
-                const textoDebito = this.page.getByText(/d[eé]bito\s*\/\s*cr[eé]dito/i).first()
-                    .or(this.page.locator('label, [class*="Radio"], [class*="radio"]').filter({ hasText: /d[eé]bito\s*\/\s*cr[eé]dito/i }).first());
+            for (let intento = 1; intento <= 6; intento++) {
+                // Obtener coordenadas exactas del elemento y su círculo
+                const coords = await this.page.evaluate(() => {
+                    const all = Array.from(document.querySelectorAll('*'));
+                    const match = all.reverse().find(el => {
+                        const txt = (el.innerText || el.textContent || '').trim();
+                        return /d[eé]bito\s*\/\s*cr[eé]dito/i.test(txt) && txt.length < 50;
+                    });
+                    if (!match) return null;
 
-                if (await textoDebito.isVisible({ timeout: 3000 }).catch(() => false)) {
-                    await textoDebito.scrollIntoViewIfNeeded().catch(() => {});
-                    await textoDebito.click({ force: true }).catch(() => {});
+                    let row = match;
+                    while (row.parentElement && row.parentElement !== document.body) {
+                        if (row.parentElement.querySelectorAll('svg, img, [class*="visa" i], [class*="card" i]').length > 0) {
+                            row = row.parentElement;
+                            break;
+                        }
+                        if (row.tagName === 'LABEL' || row.getAttribute('role') === 'radio') break;
+                        row = row.parentElement;
+                    }
 
-                    const boxD = await textoDebito.boundingBox().catch(() => null);
-                    if (boxD) {
-                        // Clic físico en el círculo del sub-radio (a la izquierda del texto)
-                        await this.page.mouse.click(boxD.x - 22, boxD.y + boxD.height / 2).catch(() => {});
-                        await this.page.mouse.click(boxD.x - 14, boxD.y + boxD.height / 2).catch(() => {});
-                        await this.page.mouse.click(boxD.x + 10, boxD.y + boxD.height / 2).catch(() => {});
+                    const rect = row.getBoundingClientRect();
+                    const circle = row.querySelector('input[type="radio"], [class*="radio" i], [class*="circle" i], svg, span:first-child');
+                    const circleRect = circle ? circle.getBoundingClientRect() : null;
+
+                    return {
+                        row: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+                        circle: circleRect && circleRect.width > 0 ? { x: circleRect.x, y: circleRect.y, width: circleRect.width, height: circleRect.height } : null
+                    };
+                }).catch(() => null);
+
+                if (coords) {
+                    if (coords.circle) {
+                        console.log(`Haciendo clic físico en el círculo de Débito/Crédito en (${coords.circle.x + coords.circle.width / 2}, ${coords.circle.y + coords.circle.height / 2})...`);
+                        await this.page.mouse.click(coords.circle.x + coords.circle.width / 2, coords.circle.y + coords.circle.height / 2).catch(() => {});
+                    } else {
+                        console.log(`Haciendo clic físico en el extremo izquierdo de la fila en (${coords.row.x + 15}, ${coords.row.y + coords.row.height / 2})...`);
+                        await this.page.mouse.click(coords.row.x + 15, coords.row.y + coords.row.height / 2).catch(() => {});
+                    }
+                    // Clic en el texto
+                    await this.page.mouse.click(coords.row.x + 60, coords.row.y + coords.row.height / 2).catch(() => {});
+                } else {
+                    // Fallback con locators de Playwright
+                    const debitoLoc = this.page.getByText(/d[eé]bito\s*\/\s*cr[eé]dito/i).first();
+                    if (await debitoLoc.isVisible({ timeout: 2000 }).catch(() => false)) {
+                        await debitoLoc.click({ force: true }).catch(() => {});
                     }
                 }
 
-                // Disparo en DOM directo sobre el sub-radio Débito / Crédito
+                // Invocación exhaustiva en DOM y React Fiber
                 await this.page.evaluate(() => {
-                    const allNodes = Array.from(document.querySelectorAll('label, div, span, p, input[type="radio"]'));
-                    for (const el of allNodes) {
-                        const txt = (el.innerText || el.textContent || el.value || '').trim();
-                        if (/d[eé]bito\s*\/\s*cr[eé]dito/i.test(txt)) {
-                            el.click();
-                            const label = el.closest('label') || el.parentElement;
-                            if (label) label.click();
-                            const input = label?.querySelector('input[type="radio"]') || el.parentElement?.querySelector('input[type="radio"]');
-                            if (input) {
-                                const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'checked')?.set;
-                                if (nativeSetter) nativeSetter.call(input, true);
-                                input.checked = true;
-                                input.click();
-                                input.dispatchEvent(new Event('input', { bubbles: true }));
-                                input.dispatchEvent(new Event('change', { bubbles: true }));
-                            }
-                            break;
+                    const all = Array.from(document.querySelectorAll('*'));
+                    const match = all.reverse().find(el => {
+                        const txt = (el.innerText || el.textContent || '').trim();
+                        return /d[eé]bito\s*\/\s*cr[eé]dito/i.test(txt) && txt.length < 50;
+                    });
+                    if (!match) return;
+
+                    let curr = match;
+                    for (let i = 0; i < 5; i++) {
+                        if (!curr) break;
+
+                        curr.click();
+                        curr.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                        curr.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                        curr.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+
+                        const rKey = Object.keys(curr).find(k => k.startsWith('__reactProps'));
+                        if (rKey && curr[rKey]) {
+                            if (typeof curr[rKey].onClick === 'function') curr[rKey].onClick({ preventDefault: () => {}, stopPropagation: () => {} });
+                            if (typeof curr[rKey].onChange === 'function') curr[rKey].onChange({ target: { checked: true } });
                         }
+
+                        const fKey = Object.keys(curr).find(k => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'));
+                        if (fKey && curr[fKey]) {
+                            let fiber = curr[fKey];
+                            let depth = 0;
+                            while (fiber && depth < 6) {
+                                if (fiber.memoizedProps?.onClick) fiber.memoizedProps.onClick({ preventDefault: () => {}, stopPropagation: () => {} });
+                                if (fiber.memoizedProps?.onChange) fiber.memoizedProps.onChange({ target: { checked: true } });
+                                fiber = fiber.return;
+                                depth++;
+                            }
+                        }
+
+                        const radio = curr.querySelector('input[type="radio"]') || (curr.tagName === 'INPUT' ? curr : null);
+                        if (radio) {
+                            const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'checked')?.set;
+                            if (nativeSetter) nativeSetter.call(radio, true);
+                            radio.checked = true;
+                            radio.dispatchEvent(new Event('input', { bubbles: true }));
+                            radio.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+
+                        curr = curr.parentElement;
                     }
                 }).catch(() => {});
 
-                await this.page.waitForTimeout(1200);
+                await this.page.waitForTimeout(1500);
 
                 // Verificar si apareció el botón de agregar tarjeta o el formulario
-                const btnNuevaPresente = await this.page.locator('button, [role="button"], a, div')
+                const btnNuevaPresente = await this.page.locator('button, [role="button"], a, div, span')
                     .filter({ hasText: /agregar nueva tarjeta|nueva tarjeta|agregar tarjeta|añadir tarjeta|\+ agregar/i })
                     .first().isVisible({ timeout: 1000 }).catch(() => false);
 
@@ -497,7 +554,7 @@ export class CheckoutPage {
                     console.log('✅ Sub-radio "Débito / Crédito" seleccionado correctamente (botón nueva tarjeta visible).');
                     break;
                 } else {
-                    console.log(`Aviso (Intento ${intento}): Reintentando clic en "Débito / Crédito"...`);
+                    console.log(`Aviso (Intento ${intento}): Reintentando selección de "Débito / Crédito"...`);
                 }
             }
 
