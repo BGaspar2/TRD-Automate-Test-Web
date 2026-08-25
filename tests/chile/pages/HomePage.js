@@ -76,10 +76,11 @@ export class HomePage {
         console.log("Procesando selección de tienda en el modal de Pickup...");
 
         if (searchQuery) {
-            const inputBusquedaModal = this.page.getByPlaceholder(/buscar locales|locales cerca|buscar dirección|dirección|ubicación|address|endereço|pesquisar|buscar/i)
-                .or(this.page.locator('input[placeholder*="locales"], input[placeholder*="Locales"], input[placeholder*="dirección"], input[placeholder*="endereço"], input[type="search"], input[type="text"]')).first();
+            const modalScope = this.page.locator('.Modal, [role="dialog"], [class*="modal" i], [class*="overlay" i], [class*="Overlay" i], .Overlay').first();
+            const inputBusquedaModal = modalScope.locator('input[type="search"], input[type="text"], input').first()
+                .or(this.page.getByPlaceholder(/buscar locales|locales cerca|buscar dirección|dirección para retirar|endereço/i).first());
 
-            if (await inputBusquedaModal.isVisible({ timeout: 5000 }).catch(() => false)) {
+            if (await inputBusquedaModal.isVisible({ timeout: 4000 }).catch(() => false)) {
                 console.log(`Escribiendo en el buscador de Pickup: "${searchQuery}"...`);
                 await inputBusquedaModal.click();
                 await inputBusquedaModal.fill(searchQuery);

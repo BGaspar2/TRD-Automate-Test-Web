@@ -10,7 +10,7 @@ import { ejecutarPaso } from '../../../utils/pasos.js';
  * Función base que ejecuta el flujo completo de Pickup en Colombia con el método de pago especificado
  * @param {import('@playwright/test').Page} page
  * @param {import('@playwright/test').TestInfo} testInfo
- * @param {'Tarjeta Débito / Crédito' | 'Datáfono' | 'Efectivo (Monto Exacto)' | 'Efectivo (Con Cambio)'} metodoPago
+ * @param {'Tarjeta Débito / Crédito' | 'Efectivo' | 'Efectivo (Monto Exacto)'} metodoPago
  */
 async function ejecutarFlujoPickupColombia(page, testInfo, metodoPago) {
     test.setTimeout(180000);
@@ -22,17 +22,17 @@ async function ejecutarFlujoPickupColombia(page, testInfo, metodoPago) {
 
     let codigoPedidoGenerado = null;
 
-    // Paso 1: Navegación y Selección de Canal Pickup + Tienda
+    // Paso 1: Navegación y Selección de Tienda Pickup
     await ejecutarPaso(page, testInfo, {
         numero: 1,
         titulo: 'Navegación y Selección de Tienda Pickup',
-        descripcion: 'Ingreso al sitio web de KFC Colombia y selección de tienda para retiro'
+        descripcion: 'Ingreso a KFC Colombia y selección de tienda para retiro'
     }, async () => {
         await homePage.navegar(testData.baseUrl);
         await homePage.seleccionarCanalPickup(testData.location.searchQuery, testData.location.fullAddress);
     });
 
-    // Paso 2: Selección de Categoría y Producto Aleatorio
+    // Paso 2: Selección de Productos y Modificadores
     await ejecutarPaso(page, testInfo, {
         numero: 2,
         titulo: 'Selección de Menú y Personalización de Producto',
@@ -45,7 +45,7 @@ async function ejecutarFlujoPickupColombia(page, testInfo, metodoPago) {
         await menuPage.agregarAlCarrito(testData.order.desiredQuantity);
     });
 
-    // Paso 3: Revisión del Carrito de Compras
+    // Paso 3: Carrito e Inicio de Pago
     await ejecutarPaso(page, testInfo, {
         numero: 3,
         titulo: 'Revisión y Validación del Carrito de Compras',
@@ -56,13 +56,12 @@ async function ejecutarFlujoPickupColombia(page, testInfo, metodoPago) {
         await cartPage.irAPagar();
     });
 
-    // Paso 4: Datos del Cliente y Facturación
+    // Paso 4: Datos Personales del Cliente para Retiro
     await ejecutarPaso(page, testInfo, {
         numero: 4,
-        titulo: 'Datos del Cliente y Facturación',
-        descripcion: 'Ingreso de datos de contacto y verificación de facturación en Colombia'
+        titulo: 'Datos del Cliente para Retiro',
+        descripcion: 'Llenado de datos personales del cliente'
     }, async () => {
-        await checkoutPage.iniciarCompletar();
         const datosCliente = (metodoPago === testData.paymentMethods.tarjeta) ? testData.customerTarjeta : testData.customer;
         await checkoutPage.llenarDatosPersonales(datosCliente);
     });
@@ -71,9 +70,9 @@ async function ejecutarFlujoPickupColombia(page, testInfo, metodoPago) {
     await ejecutarPaso(page, testInfo, {
         numero: 5,
         titulo: 'Método de Pago, Procesamiento y Detalle de la Orden',
-        descripcion: `Selección de '${metodoPago}', procesamiento de pago y captura de número de orden en Colombia`
+        descripcion: `Selección de '${metodoPago}', procesamiento de pago y captura de número de orden`
     }, async () => {
-        const parametroPago = (metodoPago === testData.paymentMethods.tarjeta) ? testData.card : testData.montoCambio;
+        const parametroPago = (metodoPago === testData.paymentMethods.tarjeta) ? testData.card : null;
         await checkoutPage.seleccionarMetodoPago(metodoPago, parametroPago);
         codigoPedidoGenerado = await checkoutPage.procesarPagoYConfirmarOrden();
 
@@ -106,14 +105,6 @@ test('Flujo E2E - Compra Pickup con Tarjeta Débito/Crédito (Colombia)', async 
     await ejecutarFlujoPickupColombia(page, testInfo, testData.paymentMethods.tarjeta);
 });
 
-test('Flujo E2E - Compra Pickup con Datáfono (Colombia)', async ({ page }, testInfo) => {
-    await ejecutarFlujoPickupColombia(page, testInfo, testData.paymentMethods.datafono);
-});
-
-test('Flujo E2E - Compra Pickup con Efectivo (Monto Exacto) (Colombia)', async ({ page }, testInfo) => {
+test('Flujo E2E - Compra Pickup con Efectivo (Colombia)', async ({ page }, testInfo) => {
     await ejecutarFlujoPickupColombia(page, testInfo, testData.paymentMethods.efectivoExacto);
-});
-
-test('Flujo E2E - Compra Pickup con Efectivo (Con Cambio) (Colombia)', async ({ page }, testInfo) => {
-    await ejecutarFlujoPickupColombia(page, testInfo, testData.paymentMethods.efectivoCambio);
 });

@@ -90,13 +90,13 @@ TRD-Automate-Test-Web/
 │   │   ├── data/testData.js          # Direcciones, datos de tarjeta (card), métodos de pago y cliente CO
 │   │   ├── pages/                    # HomePage, MenuPage, CartPage, CheckoutPage CO
 │   │   ├── delivery/flujoAnonimoDel.js # 4 pruebas independientes (Tarjeta, Datáfono, Efectivo Exacto, Efectivo Cambio)
-│   │   ├── pickup/flujoAnonimoPickup.js  # 4 pruebas de retiro (Tarjeta, Datáfono, Efectivo Exacto, Efectivo Cambio)
+│   │   ├── pickup/flujoAnonimoPickup.js  # 2 pruebas de retiro (Tarjeta y Efectivo)
 │   │   └── auth/flujoRegistroOtp.js
 │   ├── ecuador/
 │   │   ├── data/testData.js          # Direcciones, datos de tarjeta (card), métodos de pago y cliente EC
 │   │   ├── pages/                    # HomePage, MenuPage, CartPage, CheckoutPage EC
 │   │   ├── delivery/flujoAnonimoDel.js # 4 pruebas independientes (Tarjeta, POS, Efectivo Exacto, Efectivo Cambio)
-│   │   ├── pickup/flujoAnonimoPickup.js  # 4 pruebas de retiro (Tarjeta, POS, Efectivo Exacto, Efectivo Cambio)
+│   │   ├── pickup/flujoAnonimoPickup.js  # 2 pruebas de retiro (Tarjeta y Efectivo)
 │   │   └── auth/flujoRegistroOtp.js
 │   ├── venezuela/
 │   │   ├── data/testData.js          # Direcciones, métodos de pago y cliente VE
@@ -149,11 +149,9 @@ npm run test:colombia:datafono
 npm run test:colombia:efectivo:exacto
 npm run test:colombia:efectivo:cambio
 
-# Retiro en tienda (Pickup: Tarjeta, Datáfono, Efectivo Exacto, Efectivo Cambio) y Registro OTP:
+# Retiro en tienda (Pickup: Tarjeta y Efectivo) y Registro OTP:
 npm run test:colombia:pickup:tarjeta
-npm run test:colombia:pickup:datafono
-npm run test:colombia:pickup:efectivo:exacto
-npm run test:colombia:pickup:efectivo:cambio
+npm run test:colombia:pickup:efectivo
 npm run test:colombia:pickup
 npm run test:colombia:registro
 ```
@@ -172,11 +170,9 @@ npm run test:ecuador:pos
 npm run test:ecuador:efectivo:exacto
 npm run test:ecuador:efectivo:cambio
 
-# Retiro en tienda (Pickup: Tarjeta, Punto de Venta, Efectivo Exacto, Efectivo Cambio) y Registro OTP:
+# Retiro en tienda (Pickup: Tarjeta y Efectivo) y Registro OTP:
 npm run test:ecuador:pickup:tarjeta
-npm run test:ecuador:pickup:pos
-npm run test:ecuador:pickup:efectivo:exacto
-npm run test:ecuador:pickup:efectivo:cambio
+npm run test:ecuador:pickup:efectivo
 npm run test:ecuador:pickup
 npm run test:ecuador:registro
 ```
@@ -223,14 +219,20 @@ npm run test:brasil:registro
 
 ---
 
-### 5. 🚀 Ejecución Conjunta de Países con Pagos
+### 5. 🚀 Ejecución Conjunta de Países con Métodos de Pago
 
 ```bash
-# Modo Visible con navegador abierto:
-npm run test:delivery:pagos
+# 🛵 1. Todos los pagos en Delivery (CO, EC, VE):
+npm run test:delivery:pagos              # Visible
+npm run test:delivery:pagos:headless     # En segundo plano (Headless)
 
-# Modo Headless (en segundo plano):
-npm run test:delivery:pagos:headless
+# 🛍️ 2. Todos los pagos en Pickup (CO, EC):
+npm run test:pickup:pagos                # Visible
+npm run test:pickup:pagos:headless       # En segundo plano (Headless)
+
+# 💳 3. Absolutamente TODOS los pagos (Delivery + Pickup juntos):
+npm run test:pagos:todos                 # Visible
+npm run test:pagos:todos:headless        # En segundo plano (Headless)
 ```
 
 ---

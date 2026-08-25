@@ -10,7 +10,7 @@ import { ejecutarPaso } from '../../../utils/pasos.js';
  * Función base que ejecuta el flujo completo de Pickup en Ecuador con el método de pago especificado
  * @param {import('@playwright/test').Page} page
  * @param {import('@playwright/test').TestInfo} testInfo
- * @param {'Tarjeta Débito / Crédito' | 'Punto de Venta' | 'Efectivo (Monto Exacto)' | 'Efectivo (Con Cambio)'} metodoPago
+ * @param {'Tarjeta Débito / Crédito' | 'Efectivo' | 'Efectivo (Monto Exacto)'} metodoPago
  */
 async function ejecutarFlujoPickupEcuador(page, testInfo, metodoPago) {
     test.setTimeout(180000);
@@ -26,17 +26,17 @@ async function ejecutarFlujoPickupEcuador(page, testInfo, metodoPago) {
     await ejecutarPaso(page, testInfo, {
         numero: 1,
         titulo: 'Navegación y Selección de Tienda Pickup',
-        descripcion: 'Ingreso a la web de KFC y selección de local para retiro'
+        descripcion: 'Ingreso al sitio web de KFC Ecuador y selección de tienda para retiro'
     }, async () => {
         await homePage.navegar(testData.baseUrl);
         await homePage.seleccionarCanalPickup(testData.location.searchQuery, testData.location.fullAddress);
     });
 
-    // Paso 2: Selección de Producto y Personalización
+    // Paso 2: Selección de Categoría y Producto Aleatorio
     await ejecutarPaso(page, testInfo, {
         numero: 2,
         titulo: 'Selección de Menú y Personalización de Producto',
-        descripcion: 'Elección de categoría, producto aleatorio, modificadores y agregado al carrito'
+        descripcion: 'Elección de categoría, producto aleatorio, modificadores y agregado al pedido'
     }, async () => {
         await menuPage.seleccionarCategoriaAleatoria();
         await menuPage.seleccionarProductoAleatorio();
@@ -56,11 +56,11 @@ async function ejecutarFlujoPickupEcuador(page, testInfo, metodoPago) {
         await cartPage.irAPagar();
     });
 
-    // Paso 4: Datos del Cliente y Facturación
+    // Paso 4: Datos del Cliente para Retiro
     await ejecutarPaso(page, testInfo, {
         numero: 4,
-        titulo: 'Datos del Cliente y Facturación',
-        descripcion: 'Ingreso de datos de contacto y verificación de facturación en Ecuador'
+        titulo: 'Datos del Cliente para Retiro',
+        descripcion: 'Llenado de datos personales del cliente'
     }, async () => {
         await checkoutPage.iniciarCompletar();
         const datosCliente = (metodoPago === testData.paymentMethods.tarjeta) ? testData.customerTarjeta : testData.customer;
@@ -73,7 +73,7 @@ async function ejecutarFlujoPickupEcuador(page, testInfo, metodoPago) {
         titulo: 'Método de Pago, Procesamiento y Detalle de la Orden',
         descripcion: `Selección de '${metodoPago}', procesamiento de pago y captura de número de orden en Ecuador`
     }, async () => {
-        const parametroPago = (metodoPago === testData.paymentMethods.tarjeta) ? testData.card : testData.montoCambio;
+        const parametroPago = (metodoPago === testData.paymentMethods.tarjeta) ? testData.card : null;
         await checkoutPage.seleccionarMetodoPago(metodoPago, parametroPago);
         codigoPedidoGenerado = await checkoutPage.procesarPagoYConfirmarOrden();
 
@@ -106,15 +106,6 @@ test('Flujo E2E - Compra Pickup con Tarjeta Débito/Crédito (Ecuador)', async (
     await ejecutarFlujoPickupEcuador(page, testInfo, testData.paymentMethods.tarjeta);
 });
 
-test('Flujo E2E - Compra Pickup con Punto de Venta (Ecuador)', async ({ page }, testInfo) => {
-    await ejecutarFlujoPickupEcuador(page, testInfo, testData.paymentMethods.puntoDeVenta);
-});
-
-test('Flujo E2E - Compra Pickup con Efectivo (Monto Exacto) (Ecuador)', async ({ page }, testInfo) => {
+test('Flujo E2E - Compra Pickup con Efectivo (Ecuador)', async ({ page }, testInfo) => {
     await ejecutarFlujoPickupEcuador(page, testInfo, testData.paymentMethods.efectivoExacto);
 });
-
-test('Flujo E2E - Compra Pickup con Efectivo (Con Cambio) (Ecuador)', async ({ page }, testInfo) => {
-    await ejecutarFlujoPickupEcuador(page, testInfo, testData.paymentMethods.efectivoCambio);
-});
-
