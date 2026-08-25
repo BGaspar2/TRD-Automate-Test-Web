@@ -22,10 +22,29 @@ export const testData = {
         phone: "3001234567",
         document: "1012345678"
     },
+    customerTarjeta: {
+        name: "APRO",
+        lastName: "APRO",
+        email: "juan.perez@example.com",
+        phone: "3001234567",
+        document: "123456789"
+    },
     paymentMethods: {
+        tarjeta: "Tarjeta Débito / Crédito",
         datafono: "Datáfono",
         efectivoExacto: "Efectivo (Monto Exacto)",
         efectivoCambio: "Efectivo (Con Cambio)"
+    },
+    card: {
+        number: "4111 1111 1111 1111",
+        numberClean: "4111111111111111",
+        expiry: "01/30",
+        expiryMonth: "01",
+        expiryYear: "2030",
+        expiryFullYear: "2030",
+        cvv: "123",
+        name: "APRO APRO",
+        document: "123456789"
     },
     montoCambio: "100000",
     registration: {

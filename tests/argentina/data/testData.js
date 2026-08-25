@@ -18,9 +18,32 @@ export const testData = {
     customer: {
         name: "Carlos",
         lastName: "Gómez",
-        email: "carlos.gomez@example.com",
+        email: "test_12345@testuser.com",
         phone: "9112345678",
         document: "30123456"
+    },
+    customerTarjeta: {
+        name: "APRO",
+        lastName: "APRO",
+        email: "test_12345@testuser.com",
+        phone: "9112345678",
+        document: "30123456"
+    },
+    paymentMethods: {
+        tarjeta: "Tarjeta Débito / Crédito",
+        efectivo: "Efectivo"
+    },
+    card: {
+        number: "4075 5957 1648 3764",
+        numberClean: "4075595716483764",
+        expiry: "01/30",
+        expiryMonth: "01",
+        expiryYear: "2030",
+        expiryFullYear: "2030",
+        cvv: "123",
+        name: "APRO APRO",
+        document: "30123456",
+        email: "test_12345@testuser.com"
     },
     paymentMethodId: "#Efectivo",
     registration: {

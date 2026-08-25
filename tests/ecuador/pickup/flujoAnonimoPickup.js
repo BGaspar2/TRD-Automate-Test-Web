@@ -6,11 +6,21 @@ import { CartPage } from '../pages/CartPage.js';
 import { CheckoutPage } from '../pages/CheckoutPage.js';
 import { ejecutarPaso } from '../../../utils/pasos.js';
 
-test('Flujo E2E - Compra en Pickup usuario anónimo (Ecuador)', async ({ page }, testInfo) => {
+/**
+ * Función base que ejecuta el flujo completo de Pickup en Ecuador con el método de pago especificado
+ * @param {import('@playwright/test').Page} page
+ * @param {import('@playwright/test').TestInfo} testInfo
+ * @param {'Tarjeta Débito / Crédito' | 'Punto de Venta' | 'Efectivo (Monto Exacto)' | 'Efectivo (Con Cambio)'} metodoPago
+ */
+async function ejecutarFlujoPickupEcuador(page, testInfo, metodoPago) {
+    test.setTimeout(180000);
+
     const homePage = new HomePage(page);
     const menuPage = new MenuPage(page);
     const cartPage = new CartPage(page);
     const checkoutPage = new CheckoutPage(page);
+
+    let codigoPedidoGenerado = null;
 
     // Paso 1: Navegación y Selección de Canal Pickup + Tienda
     await ejecutarPaso(page, testInfo, {
@@ -46,18 +56,65 @@ test('Flujo E2E - Compra en Pickup usuario anónimo (Ecuador)', async ({ page },
         await cartPage.irAPagar();
     });
 
-    // Paso 4: Finalización de Checkout y Forma de Pago
+    // Paso 4: Datos del Cliente y Facturación
     await ejecutarPaso(page, testInfo, {
         numero: 4,
-        titulo: 'Datos de Facturación y Selección de Pago',
-        descripcion: 'Ingreso de datos de contacto y selección de método de pago'
+        titulo: 'Datos del Cliente y Facturación',
+        descripcion: 'Ingreso de datos de contacto y verificación de facturación en Ecuador'
     }, async () => {
         await checkoutPage.iniciarCompletar();
-        await checkoutPage.llenarDatosPersonales(testData.customer);
-        await checkoutPage.seleccionarMetodoPago(testData.paymentMethodId);
+        const datosCliente = (metodoPago === testData.paymentMethods.tarjeta) ? testData.customerTarjeta : testData.customer;
+        await checkoutPage.llenarDatosPersonales(datosCliente);
     });
 
-    console.log("Flujo E2E Pickup finalizado con éxito en Ecuador.");
-    await page.waitForTimeout(5000);
+    // Paso 5: Selección de Método de Pago, Procesamiento y Generación de Orden
+    await ejecutarPaso(page, testInfo, {
+        numero: 5,
+        titulo: 'Método de Pago, Procesamiento y Detalle de la Orden',
+        descripcion: `Selección de '${metodoPago}', procesamiento de pago y captura de número de orden en Ecuador`
+    }, async () => {
+        const parametroPago = (metodoPago === testData.paymentMethods.tarjeta) ? testData.card : testData.montoCambio;
+        await checkoutPage.seleccionarMetodoPago(metodoPago, parametroPago);
+        codigoPedidoGenerado = await checkoutPage.procesarPagoYConfirmarOrden();
+
+        // Registrar metadatos en el informe ejecutivo
+        testInfo.annotations.push({
+            type: 'Método de Pago',
+            description: metodoPago
+        });
+
+        if (codigoPedidoGenerado) {
+            testInfo.annotations.push({
+                type: 'Código de Pedido',
+                description: codigoPedidoGenerado
+            });
+            await testInfo.attach('📋 Código de Pedido Confirmado', {
+                body: `Código de Pedido: ${codigoPedidoGenerado}\nMétodo de Pago: ${metodoPago}`,
+                contentType: 'text/plain'
+            });
+        }
+    });
+
+    console.log(`✅ Flujo Ecuador Pickup (${metodoPago}) finalizado exitosamente. Orden: [ ${codigoPedidoGenerado} ]`);
+}
+
+// =========================================================================
+// 🇪🇨 Casos de Prueba E2E - Métodos de Pago Ecuador Pickup
+// =========================================================================
+
+test('Flujo E2E - Compra Pickup con Tarjeta Débito/Crédito (Ecuador)', async ({ page }, testInfo) => {
+    await ejecutarFlujoPickupEcuador(page, testInfo, testData.paymentMethods.tarjeta);
+});
+
+test('Flujo E2E - Compra Pickup con Punto de Venta (Ecuador)', async ({ page }, testInfo) => {
+    await ejecutarFlujoPickupEcuador(page, testInfo, testData.paymentMethods.puntoDeVenta);
+});
+
+test('Flujo E2E - Compra Pickup con Efectivo (Monto Exacto) (Ecuador)', async ({ page }, testInfo) => {
+    await ejecutarFlujoPickupEcuador(page, testInfo, testData.paymentMethods.efectivoExacto);
+});
+
+test('Flujo E2E - Compra Pickup con Efectivo (Con Cambio) (Ecuador)', async ({ page }, testInfo) => {
+    await ejecutarFlujoPickupEcuador(page, testInfo, testData.paymentMethods.efectivoCambio);
 });
 
