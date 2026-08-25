@@ -35,6 +35,7 @@
     "test:chile": "playwright test chile/delivery/flujoAnonimoDel.js --headed",
     "test:chile:tarjeta": "playwright test chile/delivery/flujoAnonimoDel.js -g \"Tarjeta\" --headed",
     "test:chile:pickup": "playwright test chile/pickup/flujoAnonimoPickup.js --headed",
+    "test:chile:pickup:tarjeta": "playwright test chile/pickup/flujoAnonimoPickup.js -g \"Tarjeta\" --headed",
     "test:chile:registro": "playwright test chile/auth/flujoRegistroOtp.js --headed",
     "test:brasil:pickup": "playwright test brasil/pickup/flujoAnonimoPickup.js --headed",
     "test:brasil:registro": "playwright test brasil/auth/flujoRegistroOtp.js --headed",
