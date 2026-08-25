@@ -77,9 +77,42 @@ export class CartPage {
         }
     }
 
+    async manejarUpselling() {
+        // 1. Detectar si la URL o el DOM contiene elementos de Upselling
+        const urlUpsell = this.page.url().includes('upsell');
+        const modalUpselling = this.page.locator('.Modal, [role="dialog"], [class*="Upsell"], [class*="upsell"], div')
+            .filter({ hasText: /elige tu opción favorita|elige tu opcion favorita|agrega algo más|agrega algo mas|combos y complementos|escolha sua opción favorita|no,\s*gracias|no\s+gracias|não,\s*obrigado|nao,\s*obrigado/i });
+
+        const btnNoGracias = this.page.getByRole('button', { name: /no,\s*gracias|no\s+gracias|não,\s*obrigado|nao,\s*obrigado/i })
+            .or(this.page.locator('button, a, div[role="button"], span').filter({ hasText: /no,\s*gracias|no\s+gracias|não,\s*obrigado|nao,\s*obrigado/i }))
+            .or(this.page.getByText(/no,\s*gracias|no\s+gracias|não,\s*obrigado|nao,\s*obrigado/i));
+
+        const esVisible = urlUpsell || (await btnNoGracias.first().isVisible({ timeout: 2500 }).catch(() => false))
+            || (await modalUpselling.first().isVisible({ timeout: 1500 }).catch(() => false));
+
+        if (esVisible) {
+            console.log("⚡ Upselling detectado en carrito ('ELIGE TU OPCIÓN FAVORITA'). Seleccionando 'No, gracias'...");
+            const btn = btnNoGracias.first();
+            if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await btn.scrollIntoViewIfNeeded().catch(() => {});
+                await btn.click({ force: true }).catch(async () => {
+                    await btn.evaluate(el => el.click());
+                });
+            } else {
+                const btnCerrar = this.page.locator('button:has(svg.feather-x), [aria-label*="close" i], [aria-label*="cerrar" i], svg.feather-x').first();
+                if (await btnCerrar.isVisible({ timeout: 1500 }).catch(() => false)) {
+                    await btnCerrar.click({ force: true }).catch(() => {});
+                }
+            }
+            await this.page.waitForTimeout(2000);
+            console.log("✓ Modal/flujo de upselling descartado con éxito.");
+        }
+    }
+
     async procesarModalCarrito() {
         console.log("Procesando modal/drawer del carrito...");
         await this.verificarLocalesCerrados();
+        await this.manejarUpselling();
         await this.page.waitForTimeout(2000);
 
         const modal = this.modalCarrito.first();
@@ -99,6 +132,8 @@ export class CartPage {
                 console.log("Navegando al carrito mediante botón flotante/encabezado...");
             }
         }
+        await this.page.waitForTimeout(2000);
+        await this.manejarUpselling();
         await this.page.waitForTimeout(3000);
         await this.verificarLocalesCerrados();
     }
@@ -106,6 +141,7 @@ export class CartPage {
     async irAPagar() {
         console.log("Navegando al checkout ('Ir a pagar' / 'Ir para o pagamento')...");
         await this.verificarLocalesCerrados();
+        await this.manejarUpselling();
 
         const candidatos = this.page.locator('.OrderTotal, button:has-text("Ir a pagar"), a:has-text("Ir a pagar"), button:has-text("Ir para o pagamento"), button[type="submit"]')
             .filter({ hasText: /ir a pagar|pagar|proceder|finalizar|checkout|ir para o pagamento|pagamento|fazer pedido|concluir/i });
@@ -129,6 +165,8 @@ export class CartPage {
         await btnVisible.click({ force: true }).catch(async () => {
             await btnVisible.evaluate(b => b.click());
         });
+        await this.page.waitForTimeout(2000);
+        await this.manejarUpselling();
         await this.page.waitForTimeout(3000);
         await this.verificarLocalesCerrados();
     }

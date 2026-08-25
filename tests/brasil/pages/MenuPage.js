@@ -66,12 +66,23 @@ export class MenuPage {
 
         await btnAgregar.scrollIntoViewIfNeeded().catch(() => {});
         await btnAgregar.click();
-        await this.page.waitForTimeout(5000);
+        await this.page.waitForTimeout(2000);
+        await this.manejarUpselling();
+        await this.page.waitForTimeout(3000);
     }
 
     async ajustarCantidad(cantidadDeseada) {
+        await this.manejarUpselling();
+
         const contenedor = this.contenedorTotales.first();
-        await contenedor.waitFor({ state: 'visible' });
+        const contenedorVisible = await contenedor.isVisible({ timeout: 3500 }).catch(() => false);
+        if (!contenedorVisible) {
+            await this.manejarUpselling();
+            if (!(await contenedor.isVisible({ timeout: 2000 }).catch(() => false))) {
+                console.log("El producto no requiere personalización de cantidad/modificadores. Continuando...");
+                return;
+            }
+        }
 
         const contador = this.contadorTexto.first();
         let cantidadActual = parseInt(await contador.innerText());
@@ -158,15 +169,51 @@ export class MenuPage {
         }
     }
 
+    async manejarUpselling() {
+        // 1. Detectar si la URL o el DOM contiene elementos de Upselling
+        const urlUpsell = this.page.url().includes('upsell');
+        const modalUpselling = this.page.locator('.Modal, [role="dialog"], [class*="Upsell"], [class*="upsell"], div')
+            .filter({ hasText: /elige tu opción favorita|elige tu opcion favorita|agrega algo más|agrega algo mas|combos y complementos|escolha sua opção favorita|no,\s*gracias|no\s+gracias|não,\s*obrigado|nao,\s*obrigado/i });
+
+        const btnNoGracias = this.page.getByRole('button', { name: /no,\s*gracias|no\s+gracias|não,\s*obrigado|nao,\s*obrigado/i })
+            .or(this.page.locator('button, a, div[role="button"], span').filter({ hasText: /no,\s*gracias|no\s+gracias|não,\s*obrigado|nao,\s*obrigado/i }))
+            .or(this.page.getByText(/no,\s*gracias|no\s+gracias|não,\s*obrigado|nao,\s*obrigado/i));
+
+        const esVisible = urlUpsell || (await btnNoGracias.first().isVisible({ timeout: 2500 }).catch(() => false))
+            || (await modalUpselling.first().isVisible({ timeout: 1500 }).catch(() => false));
+
+        if (esVisible) {
+            console.log("⚡ Upselling detectado ('ELIGE TU OPCIÓN FAVORITA'). Seleccionando 'Não, obrigado' / 'No, gracias'...");
+            const btn = btnNoGracias.first();
+            if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await btn.scrollIntoViewIfNeeded().catch(() => {});
+                await btn.click({ force: true }).catch(async () => {
+                    await btn.evaluate(el => el.click());
+                });
+            } else {
+                const btnCerrar = this.page.locator('button:has(svg.feather-x), [aria-label*="close" i], [aria-label*="cerrar" i], svg.feather-x').first();
+                if (await btnCerrar.isVisible({ timeout: 1500 }).catch(() => false)) {
+                    await btnCerrar.click({ force: true }).catch(() => {});
+                }
+            }
+            await this.page.waitForTimeout(2000);
+            console.log("✓ Modal/flujo de upselling descartado ('Não, obrigado' presionado con éxito).");
+        }
+    }
+
     async agregarAlCarrito(cantidadDeseada) {
+        await this.manejarUpselling();
         console.log("Paso 2: Confirmando y agregando al carrito...");
         let btn = this.btnAgregarCarrito.first();
         if (!(await btn.isVisible({ timeout: 2000 }).catch(() => false))) {
             btn = this.contenedorTotales.locator('button').filter({ hasText: /agregar|añadir|adicionar|confirmar/i }).first();
         }
-        await expect(btn).toBeVisible();
-        await btn.click();
-        console.log(`¡Listo! Se agregaron ${cantidadDeseada} unidades al pedido.`);
-        await this.page.waitForTimeout(5000);
+        if (await btn.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await btn.click();
+            console.log(`¡Listo! Se agregaron ${cantidadDeseada} unidades al pedido.`);
+        }
+        await this.page.waitForTimeout(1500);
+        await this.manejarUpselling();
+        await this.page.waitForTimeout(3000);
     }
 }

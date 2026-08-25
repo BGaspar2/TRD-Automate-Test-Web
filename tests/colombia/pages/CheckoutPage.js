@@ -870,87 +870,152 @@ export class CheckoutPage {
     }
 
     /**
-     * Procesa el pago, espera a que cargue la pantalla con el 'Código de pedido' y lo extrae con exactitud
+     * Procesa el pago, espera a que cargue la pantalla con el 'Código de pedido' o 'Tu pedido ha sido creado con éxito' y lo extrae
      * @returns {Promise<string>} Número / Código de Pedido
      */
     async procesarPagoYConfirmarOrden() {
-        console.log("Iniciando proceso de pago y creación de orden...");
+        console.log("Iniciando proceso de pago y creación de orden en Colombia...");
 
         this.codigoPedido = null;
 
         // Asegurar una última vez que los datos de facturación estén marcados
         await this.asegurarDatosFacturacion();
 
+        // Escucha de respuesta de red de creación de orden (API)
+        const promesaRespuestaOrden = this.page.waitForResponse(
+            response => /order|checkout|transaction|payment|pedido/i.test(response.url()) && response.request().method() === 'POST',
+            { timeout: 20000 }
+        ).then(async (res) => {
+            try {
+                const json = await res.json();
+                const rawCode = json.orderNumber || json.orderId || json.data?.orderNumber || json.data?.orderId || (json.id && typeof json.id === 'string' && json.id.length > 4 ? json.id : null);
+                if (rawCode && !['200', '201', 'ok', 'success', 'true'].includes(String(rawCode).toLowerCase())) {
+                    return String(rawCode);
+                }
+            } catch (e) {}
+            return null;
+        }).catch(() => null);
+
         // 1. Hacer clic en el botón de Pagar / Realizar Pedido
         const btnPagar = this.btnPagar.last();
         await btnPagar.waitFor({ state: 'visible', timeout: 10000 });
         await btnPagar.scrollIntoViewIfNeeded().catch(() => {});
 
-        console.log("Haciendo clic en el botón 'Pagar'...");
+        console.log("Haciendo clic en el botón 'Pagar' en Colombia...");
         await btnPagar.click({ force: true }).catch(async () => {
             await btnPagar.evaluate(b => b.click());
         });
 
         // 2. Monitorear estado: 'Procesando...'
         console.log("Esperando procesamiento del pedido...");
-        if (await this.indicadorProcesando.first().isVisible({ timeout: 4000 }).catch(() => false)) {
+        if (await this.indicadorProcesando.first().isVisible({ timeout: 3000 }).catch(() => false)) {
             console.log("⏳ [Estado]: Procesando orden en curso...");
         }
 
         // 3. Monitorear estado: 'Orden creada exitosamente'
         const toastExito = this.toastOrdenCreada.first();
-        if (await toastExito.isVisible({ timeout: 15000 }).catch(() => false)) {
+        if (await toastExito.isVisible({ timeout: 8000 }).catch(() => false)) {
             const msg = await toastExito.innerText().catch(() => 'Orden creada exitosamente');
             console.log(`🎉 [Toast Confirmado]: "${msg.trim()}"`);
         }
 
-        // 4. ESPERAR A QUE CARGUE LA PANTALLA DE DETALLE CON EL TEXTO "Código de pedido:"
-        console.log("Esperando a que la pantalla de Detalle de la Orden cargue por completo...");
+        // 4. ESPERAR A QUE LA PANTALLA TRANSICIONE AL DETALLE DE LA ORDEN CON EL CÓDIGO DE PEDIDO
+        console.log("Esperando a que la pantalla cargue el Detalle de la Orden y el Código del Pedido en Colombia...");
 
-        const labelCodigoPedido = this.page.locator('text=/código de pedido|codigo de pedido|código del pedido|número de pedido/i')
-            .or(this.page.locator('p, span, div, h1, h2, h3, strong').filter({ hasText: /código de pedido|codigo de pedido|número de pedido/i }));
+        // Esperar a que el botón de pagar y el checkout se desmonten
+        await this.btnPagar.last().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
 
-        await labelCodigoPedido.first().waitFor({ state: 'visible', timeout: 40000 }).catch(() => {
-            console.log("Aviso: Esperando renderizado de la tarjeta de pedido...");
-        });
+        const labelCodigoPedido = this.page.locator('text=/c[óo]digo d?e?l?\s*pedido|n[úu]mero d?e?l?\s*pedido|n[úu]mero de orden/i')
+            .or(this.page.locator('p, span, div, h1, h2, h3, strong').filter({ hasText: /c[óo]digo d?e?l?\s*pedido|n[úu]mero d?e?l?\s*pedido/i }))
+            .or(this.page.locator('[class*="OrderDetail"], [class*="order-detail"], [class*="OrderCard"]'));
 
-        // Scroll físico y centrado de la tarjeta de la orden
-        console.log("Haciendo scroll para centrar la tarjeta de pedido en pantalla...");
-        await labelCodigoPedido.first().scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
-        await this.page.mouse.wheel(0, 450);
+        // Monitoreo activo segundo a segundo hasta que aparezca el código o la pantalla de detalle de orden
+        for (let seg = 1; seg <= 35; seg++) {
+            const visible = await labelCodigoPedido.first().isVisible().catch(() => false);
+            
+            const textoBody = await this.page.innerText('body').catch(() => '');
+            const matchBody = textoBody.match(/c[óo]digo d?e?l?\s*pedido:\s*([0-9A-Za-z-]+)/i)
+                || textoBody.match(/#(CO-[0-9]+|[0-9]{5,}-[0-9]{4,}|[0-9]{6,})/i)
+                || textoBody.match(/(\d{8,12}-\d{4,8})/);
+
+            const codigoEncontrado = matchBody && matchBody[1] && !['200', '201', '400', '500', 'procesando'].includes(matchBody[1].toLowerCase());
+
+            if (visible || codigoEncontrado) {
+                console.log(`✅ Detalle de la orden y código detectados (segundo ${seg}).`);
+                break;
+            }
+
+            if (seg % 5 === 0) {
+                console.log(`⏳ Esperando renderizado de la pantalla de detalle... (${seg}/35s)`);
+            }
+            await this.page.waitForTimeout(1000);
+        }
+
+        // Dar un tiempo adicional para que los datos del código y la tarjeta terminen de pintarse en el DOM
+        await this.page.waitForTimeout(3000);
+
+        // Scroll físico y centrado de la tarjeta de la orden para que salga perfecta en la captura
+        console.log("Centrando la tarjeta de la orden en pantalla...");
+        const elementoCodigo = this.page.locator('text=/c[óo]digo d?e?l?\s*pedido|n[úu]mero d?e?l?\s*pedido/i').first();
+        if (await elementoCodigo.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await elementoCodigo.scrollIntoViewIfNeeded({ timeout: 4000 }).catch(() => {});
+        } else {
+            await this.page.mouse.wheel(0, 300);
+        }
+
         await this.page.evaluate(() => {
-            const el = Array.from(document.querySelectorAll('*')).find(e => e.innerText && /código de pedido|código del pedido/i.test(e.innerText));
+            const el = Array.from(document.querySelectorAll('*')).find(e => e.innerText && /código de pedido|código del pedido|número de pedido/i.test(e.innerText));
             if (el) {
-                el.scrollIntoView({ behavior: 'instant', block: 'center' });
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }).catch(() => {});
 
         await this.page.waitForTimeout(2000);
 
         // 5. Extraer el valor exacto del código de pedido
-        console.log("Extrayendo código de pedido de la pantalla de detalle...");
+        console.log("Extrayendo código de pedido de la pantalla de detalle / respuesta en Colombia...");
 
-        const elemento = labelCodigoPedido.first();
-        if (await elemento.isVisible().catch(() => false)) {
-            const textoPadre = await elemento.evaluate(el => {
-                return (el.parentElement?.innerText || el.innerText || '').trim();
-            }).catch(() => '');
+        for (let reintento = 1; reintento <= 8; reintento++) {
+            const elemento = this.page.locator('text=/c[óo]digo d?e?l?\s*pedido|n[úu]mero d?e?l?\s*pedido/i')
+                .or(this.page.locator('p, span, div, h1, h2, h3, strong').filter({ hasText: /c[óo]digo d?e?l?\s*pedido|n[úu]mero d?e?l?\s*pedido/i })).first();
 
-            console.log(`Texto capturado del elemento: "${textoPadre}"`);
+            if (await elemento.isVisible({ timeout: 1500 }).catch(() => false)) {
+                const textoPadre = await elemento.evaluate(el => {
+                    return (el.parentElement?.innerText || el.innerText || '').trim();
+                }).catch(() => '');
 
-            const match = textoPadre.match(/c[óo]digo d?e?l?\s*pedido:\s*([0-9A-Za-z-]+)/i);
-            if (match && match[1]) {
-                this.codigoPedido = match[1].trim();
+                const match = textoPadre.match(/c[óo]digo d?e?l?\s*pedido:\s*([0-9A-Za-z-]+)/i);
+                if (match && match[1] && !['200', '201', 'procesando'].includes(match[1].toLowerCase())) {
+                    this.codigoPedido = match[1].trim();
+                    break;
+                }
+            }
+
+            const textoBody = await this.page.innerText('body').catch(() => '');
+            const matchBody = textoBody.match(/c[óo]digo d?e?l?\s*pedido:\s*([0-9A-Za-z-]+)/i)
+                || textoBody.match(/#(CO-[0-9]+|[0-9]{5,}-[0-9]{4,}|[0-9]{6,})/i)
+                || textoBody.match(/(\d{8,12}-\d{4,8})/);
+
+            if (matchBody && matchBody[1] && !['200', '201', 'procesando'].includes(matchBody[1].toLowerCase())) {
+                this.codigoPedido = matchBody[1].trim();
+                break;
+            }
+
+            await this.page.waitForTimeout(1000);
+        }
+
+        if (!this.codigoPedido) {
+            const codigoRed = await promesaRespuestaOrden;
+            if (codigoRed && !['200', '201', 'ok', 'true'].includes(String(codigoRed).toLowerCase())) {
+                this.codigoPedido = codigoRed;
             }
         }
 
         if (!this.codigoPedido) {
-            const textoBody = await this.page.innerText('body').catch(() => '');
-            const matchBody = textoBody.match(/c[óo]digo d?e?l?\s*pedido:\s*([0-9A-Za-z-]+)/i)
-                || textoBody.match(/#(CO-[0-9]+|[0-9]{5,}-[0-9]{4,}|[0-9]{6,})/i);
-
-            if (matchBody && matchBody[1]) {
-                this.codigoPedido = matchBody[1].trim();
+            const urlActual = this.page.url();
+            const matchUrl = urlActual.match(/(?:order|pedido|orden|checkout)[\/=]([A-Za-z0-9-]+)/i);
+            if (matchUrl && matchUrl[1] && !['success', 'confirm', 'detail', 'order', 'checkout'].includes(matchUrl[1].toLowerCase())) {
+                this.codigoPedido = matchUrl[1];
             }
         }
 
@@ -959,6 +1024,7 @@ export class CheckoutPage {
         console.log(`📋 Código de Pedido: [ ${this.codigoPedido || 'CONFIRMADO'} ]`);
         console.log(`======================================================`);
 
+        // Pausa para asegurar la captura completa en el reporte ejecutivo
         await this.page.waitForTimeout(5000);
 
         return this.codigoPedido;
