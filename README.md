@@ -112,8 +112,11 @@ npm run test:colombia:datafono
 npm run test:colombia:efectivo:exacto
 npm run test:colombia:efectivo:cambio
 
-# Retiro en tienda (Pickup con Tarjeta y General) y Registro OTP:
+# Retiro en tienda (Pickup: Tarjeta, Datáfono, Efectivo Exacto, Efectivo Cambio) y Registro OTP:
 npm run test:colombia:pickup:tarjeta
+npm run test:colombia:pickup:datafono
+npm run test:colombia:pickup:efectivo:exacto
+npm run test:colombia:pickup:efectivo:cambio
 npm run test:colombia:pickup
 npm run test:colombia:registro
 ```
@@ -132,8 +135,11 @@ npm run test:ecuador:pos
 npm run test:ecuador:efectivo:exacto
 npm run test:ecuador:efectivo:cambio
 
-# Retiro en tienda (Pickup con Tarjeta y General) y Registro OTP:
+# Retiro en tienda (Pickup: Tarjeta, Punto de Venta, Efectivo Exacto, Efectivo Cambio) y Registro OTP:
 npm run test:ecuador:pickup:tarjeta
+npm run test:ecuador:pickup:pos
+npm run test:ecuador:pickup:efectivo:exacto
+npm run test:ecuador:pickup:efectivo:cambio
 npm run test:ecuador:pickup
 npm run test:ecuador:registro
 ```
