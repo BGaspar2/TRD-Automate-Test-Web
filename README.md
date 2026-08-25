@@ -173,7 +173,21 @@ npm run test:brasil:registro
 
 ---
 
-### 5. 🌐 Suites Regionales LATAM (Multi-País)
+### 5. 🚀 Ejecución Conjunta de los 3 Países con Pagos (CO, EC, VE)
+
+Para ejecutar secuencialmente los **9 casos de prueba** (3 métodos de pago para cada uno de los 3 países):
+
+```bash
+# Modo Visible con navegador abierto:
+npm run test:delivery:pagos
+
+# Modo Headless (en segundo plano):
+npm run test:delivery:pagos:headless
+```
+
+---
+
+### 6. 🌐 Suites Regionales LATAM (Multi-País)
 
 ```bash
 # Compras Anónimas en toda la región (Modo Visible / Headless):
