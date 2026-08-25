@@ -692,7 +692,7 @@ export class CheckoutPage {
                 await labelDirect.click({ force: true }).catch(() => {});
             }
 
-            // 3. Disparo a nivel DOM y React Props
+            // 3. Disparo a nivel DOM y React Props enfocado exclusivamente en la opción seleccionada (sin subir al contenedor padre)
             await this.page.evaluate((esDatafonoFlag) => {
                 const targetRegex = esDatafonoFlag ? /dat[aá]fono/i : /^efectivo$/i;
                 const allNodes = Array.from(document.querySelectorAll('*'));
@@ -703,36 +703,32 @@ export class CheckoutPage {
                 });
 
                 if (matchNode) {
-                    matchNode.click();
-                    let parent = matchNode.parentElement;
-                    let depth = 0;
-                    while (parent && parent !== document.body && depth < 4) {
-                        parent.click();
-                        
-                        const reactKey = Object.keys(parent).find(k => k.startsWith('__reactProps'));
-                        if (reactKey && parent[reactKey] && typeof parent[reactKey].onClick === 'function') {
-                            parent[reactKey].onClick({ preventDefault: () => {}, stopPropagation: () => {} });
-                        }
+                    const optionContainer = matchNode.closest('label, [role="radio"], div[class*="Radio" i], div[class*="radio" i], div[class*="item" i]') || matchNode;
+                    optionContainer.click();
+                    
+                    const radio = optionContainer.querySelector('input[type="radio"]') || (optionContainer.tagName === 'INPUT' ? optionContainer : null);
+                    if (radio) {
+                        const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'checked')?.set;
+                        if (nativeSetter) nativeSetter.call(radio, true);
+                        radio.checked = true;
+                        radio.dispatchEvent(new Event('input', { bubbles: true }));
+                        radio.dispatchEvent(new Event('change', { bubbles: true }));
+                        radio.click();
+                    }
 
-                        const radio = parent.querySelector('input[type="radio"]');
-                        if (radio) {
-                            radio.checked = true;
-                            radio.click();
-                            radio.dispatchEvent(new Event('input', { bubbles: true }));
-                            radio.dispatchEvent(new Event('change', { bubbles: true }));
-                        }
-
-                        parent = parent.parentElement;
-                        depth++;
+                    const rKey = Object.keys(optionContainer).find(k => k.startsWith('__reactProps'));
+                    if (rKey && optionContainer[rKey]) {
+                        if (typeof optionContainer[rKey].onClick === 'function') optionContainer[rKey].onClick({ preventDefault: () => {}, stopPropagation: () => {} });
+                        if (typeof optionContainer[rKey].onChange === 'function') optionContainer[rKey].onChange({ target: { checked: true } });
                     }
                 }
             }, esDatafono).catch(() => {});
 
-            await this.page.waitForTimeout(1500);
+            await this.page.waitForTimeout(1000);
 
             // 4. Verificar si 'Débito / Crédito' y 'No olvides ingresar tu tarjeta' desaparecieron
             const advertenciaTarjeta = this.page.locator('text=/no olvides ingresar tu tarjeta|débito \\/ crédito/i');
-            const sigueTarjeta = await advertenciaTarjeta.first().isVisible({ timeout: 1000 }).catch(() => false);
+            const sigueTarjeta = await advertenciaTarjeta.first().isVisible({ timeout: 800 }).catch(() => false);
             if (!sigueTarjeta) {
                 console.log(`✅ Confirmado: "${nombreBuscar}" seleccionado correctamente.`);
                 break;
@@ -742,44 +738,96 @@ export class CheckoutPage {
         }
 
         if (!esDatafono) {
-            // Localizador estricto del Switch de 'Pagar con valor total / Monto exacto' (NUNCA tocar el checkbox de facturación)
-            const switchValorTotal = this.page.locator('label, div, p')
-                .filter({ hasText: /valor total|monto exacto|total exacto|pago total|monto a pagar/i })
-                .locator('input, [role="switch"], .Switch, [class*="switch"], [class*="Toggle"], [class*="checkbox"]')
-                .or(this.page.locator('label').filter({ hasText: /valor total|monto exacto|total exacto|pago total/i }));
+            // Localizador estricto del Switch de 'Pagar con el valor exacto' / 'Monto exacto' / 'Valor total'
+            const switchRegex = /valor exacto|monto exacto|valor total|total exacto|pago total|monto a pagar/i;
+            const rowSwitch = this.page.locator('label, div, p, span, li').filter({ hasText: switchRegex }).last();
 
-            const switchEl = switchValorTotal.first();
+            if (esEfectivoExacto) {
+                console.log('Configurando Efectivo con monto exacto: Asegurando que el switch esté activo...');
+                if (await rowSwitch.isVisible({ timeout: 3000 }).catch(() => false)) {
+                    const estaActivo = await rowSwitch.evaluate(cont => {
+                        const inp = cont.querySelector('input');
+                        if (inp) return inp.checked;
+                        const sw = cont.querySelector('[role="switch"], [aria-checked], [data-checked]') || cont;
+                        if (sw.getAttribute('aria-checked') !== null) return sw.getAttribute('aria-checked') === 'true';
+                        if (sw.getAttribute('data-checked') !== null) return sw.getAttribute('data-checked') === 'true';
+                        const circle = cont.querySelector('span, div, [class*="thumb" i], [class*="slider" i], [class*="circle" i]');
+                        if (circle) {
+                            const cRect = circle.getBoundingClientRect();
+                            const pRect = (circle.parentElement || cont).getBoundingClientRect();
+                            if (cRect.x > pRect.x + pRect.width / 3) return true;
+                        }
+                        return /bg-red|bg-primary|active|checked|on\b/i.test(cont.className + ' ' + (sw.className || ''));
+                    }).catch(() => false);
 
-            const switchPresente = await switchEl.isVisible({ timeout: 2000 }).catch(() => false);
-            if (switchPresente) {
-                const estaActivo = await switchEl.evaluate(node => {
-                    if (node.tagName === 'INPUT') return node.checked;
-                    if (node.getAttribute('aria-checked') !== null) return node.getAttribute('aria-checked') === 'true';
-                    if (node.getAttribute('data-checked') !== null) return node.getAttribute('data-checked') === 'true';
-                    const inputInside = node.querySelector('input[type="checkbox"]');
-                    if (inputInside) return inputInside.checked;
-                    return node.classList.contains('active') || node.classList.contains('checked') || node.classList.contains('on');
-                }).catch(() => false);
-
-                if (esEfectivoExacto && !estaActivo) {
-                    console.log('Activando switch de valor total (monto exacto)...');
-                    await switchEl.click({ force: true }).catch(async () => {
-                        await switchEl.evaluate(el => el.click());
-                    });
-                    console.log('✅ Switch de valor total activado.');
-                } else if (esEfectivoCambio && estaActivo) {
-                    console.log('Desactivando switch de valor total para habilitar input de cambio...');
-                    await switchEl.click({ force: true }).catch(async () => {
-                        await switchEl.evaluate(el => el.click());
-                    });
-                    console.log('✅ Switch de valor total desactivado.');
+                    if (!estaActivo) {
+                        console.log('Activando switch de valor exacto...');
+                        const toggleBtn = rowSwitch.locator('[role="switch"], input, button, [class*="switch" i], [class*="toggle" i], [class*="slider" i]').last();
+                        if (await toggleBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+                            await toggleBtn.click({ force: true }).catch(() => {});
+                        } else {
+                            await rowSwitch.click({ force: true }).catch(() => {});
+                        }
+                    }
+                    console.log('✅ Switch de valor exacto activo.');
                 }
-            }
+            } else if (esEfectivoCambio) {
+                console.log('Configurando Efectivo con cambio: Desactivando switch de valor exacto...');
 
-            if (esEfectivoCambio) {
+                for (let intentoSwitch = 1; intentoSwitch <= 4; intentoSwitch++) {
+                    const isVisible = await rowSwitch.isVisible({ timeout: 2000 }).catch(() => false);
+                    if (!isVisible) {
+                        await this.page.waitForTimeout(500);
+                        continue;
+                    }
+
+                    // Verificar si el input de cambio ya apareció
+                    const inputMontoExistente = this.page.locator('input[name*="change" i], input[name*="amount" i], input[name*="cash" i], input[placeholder*="monto" i], input[placeholder*="cambio" i], input[placeholder*="cuánto" i], input[placeholder*="cuanto" i], input[placeholder*="con cuánto" i], input[placeholder*="con cuanto" i], input[type="number"]').first();
+                    if (await inputMontoExistente.isVisible({ timeout: 800 }).catch(() => false)) {
+                        console.log('✅ Input de cambio visible tras desactivar switch.');
+                        break;
+                    }
+
+                    const estaActivo = await rowSwitch.evaluate(cont => {
+                        const inp = cont.querySelector('input');
+                        if (inp) return inp.checked;
+                        const sw = cont.querySelector('[role="switch"], [aria-checked], [data-checked]') || cont;
+                        if (sw.getAttribute('aria-checked') !== null) return sw.getAttribute('aria-checked') === 'true';
+                        if (sw.getAttribute('data-checked') !== null) return sw.getAttribute('data-checked') === 'true';
+                        const circle = cont.querySelector('span, div, [class*="thumb" i], [class*="slider" i], [class*="circle" i]');
+                        if (circle) {
+                            const cRect = circle.getBoundingClientRect();
+                            const pRect = (circle.parentElement || cont).getBoundingClientRect();
+                            if (cRect.x > pRect.x + pRect.width / 3) return true;
+                        }
+                        return /bg-red|bg-primary|active|checked|on\b/i.test(cont.className + ' ' + (sw.className || ''));
+                    }).catch(() => true);
+
+                    if (estaActivo) {
+                        console.log(`Intento ${intentoSwitch}: Desactivando switch de 'Pagar con el valor exacto'...`);
+                        const toggleBtn = rowSwitch.locator('[role="switch"], input, button, [class*="switch" i], [class*="toggle" i], [class*="slider" i]').last();
+                        if (await toggleBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+                            await toggleBtn.click({ force: true }).catch(() => {});
+                        } else {
+                            await rowSwitch.click({ force: true }).catch(() => {});
+                        }
+
+                        await rowSwitch.evaluate(cont => {
+                            const target = cont.querySelector('[role="switch"], input, button, span, div') || cont;
+                            target.click();
+                            const rKey = Object.keys(target).find(k => k.startsWith('__reactProps'));
+                            if (rKey && target[rKey]?.onClick) target[rKey].onClick({ preventDefault: () => {}, stopPropagation: () => {} });
+                            if (rKey && target[rKey]?.onChange) target[rKey].onChange({ target: { checked: false } });
+                        }).catch(() => {});
+
+                        await this.page.waitForTimeout(1000);
+                    }
+                }
+
+                // Llenar el monto para cambio
                 await this.page.waitForTimeout(1000);
 
-                let montoADar = montoCambio || '100000';
+                let montoADar = (typeof montoCambioOCard === 'string' || typeof montoCambioOCard === 'number') ? String(montoCambioOCard) : '100000';
                 
                 const totalElement = this.page.locator('.OrderSummary, [class*="Total"], [class*="total"], strong, span')
                     .filter({ hasText: /\$\s*\d+|\b\d+[.,]\d{2}\b/ }).last();
@@ -794,15 +842,18 @@ export class CheckoutPage {
                     }
                 }
 
-                const inputMonto = this.page.locator('input[name*="change"], input[name*="amount"], input[name*="cash"], input[placeholder*="monto"], input[placeholder*="cambio"], input[type="number"], input[placeholder*="con cuánto" i], input[placeholder*="con cuanto" i]').first()
+                const inputMonto = this.page.locator('input[name*="change" i], input[name*="amount" i], input[name*="cash" i], input[placeholder*="monto" i], input[placeholder*="cambio" i], input[placeholder*="cuánto" i], input[placeholder*="cuanto" i], input[placeholder*="con cuánto" i], input[placeholder*="con cuanto" i], input[type="number"]').first()
                     .or(this.page.locator('.PaymentMethods input[type="text"], [class*="Payment"] input[type="text"], input[type="text"]').last());
 
                 if (await inputMonto.isVisible({ timeout: 4000 }).catch(() => false)) {
                     console.log(`Llenando monto que se va a pagar (mayor al total): "$${montoADar}"`);
                     await inputMonto.click();
-                    await inputMonto.fill(montoADar);
+                    await inputMonto.fill('');
+                    await inputMonto.pressSequentially(montoADar, { delay: 40 });
                     await inputMonto.evaluate((el, v) => {
-                        el.value = v;
+                        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+                        if (setter) setter.call(el, v);
+                        else el.value = v;
                         el.dispatchEvent(new Event('input', { bubbles: true }));
                         el.dispatchEvent(new Event('change', { bubbles: true }));
                         el.dispatchEvent(new Event('blur', { bubbles: true }));
